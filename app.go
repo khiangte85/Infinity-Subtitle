@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"infinity-subtitle/database"
 )
 
 // App struct
@@ -19,6 +20,25 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Initialize database
+	err := database.GetDB().Init()
+	if err != nil {
+		println("Error initializing database:", err.Error())
+	}
+
+	// Check if tables exist
+	exists, err := database.CheckTablesExists()
+	if err != nil {
+		println("Error checking tables:", err.Error())
+	}
+
+	if !exists {
+		err = database.CreateTables()
+		if err != nil {
+			println("Error creating tables:", err.Error())
+		}
+	}
 }
 
 // Greet returns a greeting for the given name

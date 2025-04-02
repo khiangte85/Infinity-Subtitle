@@ -27,6 +27,7 @@ func main() {
 		Bind: []any{
 			app,
 		},
+		AlwaysOnTop: false,
 	})
 
 	if err != nil {

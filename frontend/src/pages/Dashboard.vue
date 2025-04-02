@@ -2,7 +2,5 @@
 </script>
 
 <template>
-  <div>
-    <h3>Dashboard</h3>
-  </div>
+  <h5 class="text-h5">Dashboard</h5>
 </template>

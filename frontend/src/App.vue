@@ -1,8 +1,17 @@
+<script lang="ts" setup>
+  import { ref } from 'vue';
+  import SideBar from './components/SideBar.vue';
+
+  const leftDrawerOpen = ref(false);
+
+  function toggleLeftDrawer() {
+    leftDrawerOpen.value = !leftDrawerOpen.value;
+  }
+</script>
 <template>
-  <q-layout view="hHh lpR fFf">
+  <q-layout view="lHh Lpr lFf">
     <q-header
       bordered
-      class="bg-primary text-white"
     >
       <q-toolbar>
         <q-btn
@@ -27,23 +36,13 @@
       bordered
     >
       <!-- drawer content -->
-       sidebar
+      <SideBar />
     </q-drawer>
 
     <q-page-container>
-      <q-page>
+      <q-page class="q-px-lg q-pt-sm text-left">
         <router-view :key="$route.fullPath" />
       </q-page>
     </q-page-container>
   </q-layout>
 </template>
-
-<script lang="ts" setup>
-  import { ref } from 'vue';
-
-  const leftDrawerOpen = ref(false);
-
-  function toggleLeftDrawer() {
-    leftDrawerOpen.value = !leftDrawerOpen.value;
-  }
-</script>

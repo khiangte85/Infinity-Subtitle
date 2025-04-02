@@ -1,6 +1,6 @@
 html {
     background-color: #fff;
-    text-align: center;
+    text-align: left;
 }
 
 body {
@@ -22,3 +22,25 @@ body {
     height: 100vh;
     background-color: #ffffff;
 }
+.active-route-link{
+    background-color: #444b59;
+}
+.q-drawer {
+    background-color: #232c3b !important;
+    color: #fff !important;
+}
+.q-header{
+    background-color: #f3f5f7 !important;
+    color: #232c3b !important;
+}
+.q-table thead tr {
+    background-color: #f0f0f0;
+    color: #333333;
+}
+.q-table thead tr th {
+    font-weight: 700;
+    font-size: 13px;
+}
+
+
+

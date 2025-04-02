@@ -6,7 +6,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Dashboard',
     meta: {
       title: 'Dashboard',
-      icon: 'mdi-monitor-dashboard',
+      icon: 'fas fa-tv',
     },
     component: () => import('../pages/Dashboard.vue'),
   },
@@ -15,7 +15,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Movies',
     meta: {
       title: 'Movies',
-      icon: 'mdi-movie',
+      icon: 'fas fa-film',
     },
     component: () => import('../pages/Movies.vue'),
   },

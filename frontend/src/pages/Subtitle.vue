@@ -3,6 +3,6 @@
 
 <template>
   <div>
-    <h1>Subtitle</h1>
+    <h3>Subtitle</h3>
   </div>
 </template>

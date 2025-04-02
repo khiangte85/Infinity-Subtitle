@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -19,6 +20,10 @@ func (db *Database) Connect() (error) {
 		return err
 	}
 
+	db.DB.SetMaxOpenConns(10)
+	db.DB.SetMaxIdleConns(10)
+	db.DB.SetConnMaxLifetime(time.Minute * 5)
+	
 	return nil
 }
 

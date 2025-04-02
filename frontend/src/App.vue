@@ -27,6 +27,7 @@
       bordered
     >
       <!-- drawer content -->
+       sidebar
     </q-drawer>
 
     <q-page-container>

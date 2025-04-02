@@ -1,11 +1,6 @@
 import { createRouter, createMemoryHistory, RouteRecordRaw } from 'vue-router';
 
-const routes: RouteRecordRaw[] = [
-  {
-    path: '/',
-    component: () => {},
-  },
-];
+import routes from './routes';
 
 const router = createRouter({
   history: createMemoryHistory(),

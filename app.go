@@ -22,22 +22,14 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
 	// Initialize database
-	err := database.GetDB().Init()
+	err := database.GetDB().Init();
 	if err != nil {
 		println("Error initializing database:", err.Error())
 	}
 
 	// Check if tables exist
-	exists, err := database.CheckTablesExists()
-	if err != nil {
-		println("Error checking tables:", err.Error())
-	}
-
-	if !exists {
-		err = database.CreateTables()
-		if err != nil {
-			println("Error creating tables:", err.Error())
-		}
+	if !database.CheckTablesExists() {
+		database.CreateTables()
 	}
 }
 

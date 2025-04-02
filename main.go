@@ -17,7 +17,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:      "infinity-subtitle",
+		Title:      "Infinity Subtitle",
 		Fullscreen: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,

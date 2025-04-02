@@ -1,22 +1,48 @@
 package database
 
-func CreateTables() error {
+import (
+	"context"
+	"fmt"
+	"log"
+)
+
+func CreateTables() {
 	db := GetDB()
 
-	_, err := db.Exec(`
-	CREATE TABLE IF NOT EXISTS movies (
+	tx, err := db.BeginTx(context.Background(), nil)
+	if err != nil {
+		log.Fatal("[x] Error beginning transaction:", err)
+	}
+
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+	CREATE TABLE IF NOT EXISTS languages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		title TEXT NOT NULL,
-		default_language TEXT NOT NULL,
-		languages JSON NOT NULL,
+		name TEXT NOT NULL,
+		code TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 
 	if err != nil {
-		return err
+		log.Fatal("[x] Error creating languages table:", err)
 	}
 
-	_, err = db.Exec(`
+	_, err = tx.Exec(`
+	CREATE TABLE IF NOT EXISTS movies (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		title TEXT NOT NULL,
+		default_language_id INTEGER NOT NULL,
+		languages JSON NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (default_language_id) REFERENCES languages(id)
+	)`)
+
+	if err != nil {
+		log.Fatal("[x] Error creating movies table:", err)
+	}
+
+	_, err = tx.Exec(`
 	CREATE TABLE IF NOT EXISTS subtitles (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		movie_id INTEGER NOT NULL,
@@ -30,38 +56,70 @@ func CreateTables() error {
 	)`)
 
 	if err != nil {
-		return err
+		log.Fatal("[x] Error creating subtitles table:", err)
 	}
 
-	// create index on subtitles table
-	_, err = db.Exec(`
-	CREATE INDEX IF NOT EXISTS idx_movie_id ON subtitles (movie_id)
-	CREATE INDEX IF NOT EXISTS idx_sl_no ON subtitles (sl_no)
+	// Create indexes separately
+	_, err = tx.Exec("CREATE INDEX IF NOT EXISTS idx_movie_id ON subtitles(movie_id)")
+	if err != nil {
+		log.Fatal("[x] Error creating movie_id index:", err)
+	}
+
+	_, err = tx.Exec("CREATE INDEX IF NOT EXISTS idx_sl_no ON subtitles(sl_no)")
+	if err != nil {
+		log.Fatal("[x] Error creating sl_no index:", err)
+	}
+
+	// Insert languages
+	_, err = tx.Exec(`
+	INSERT INTO languages (name, code) VALUES 
+	('English', 'en'),
+	('Chinese', 'zh'),
+	('Japanese', 'ja'),
+	('Korean', 'ko'),
+	('Thai', 'th'),
+	('Indonesian', 'id'),
+	('Malay', 'ms'),
+	('Vietnamese', 'vi'),
+	('Hindi', 'hi')
 	`)
 
 	if err != nil {
-		return err
+		log.Fatal("[x] Error inserting languages:", err)
 	}
 
-	return nil
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal("[x] Error committing transaction:", err)
+	}
 }
 
-func CheckTablesExists() (bool, error) {
+func CheckTablesExists() bool {
 	db := GetDB()
 
 	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='movies')").Scan(&exists)
-	if err != nil {
-		return false, err
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='languages')").Scan(&exists)
+	if err != nil || !exists {
+		fmt.Println("[x] Error checking languages table:", err)
+		return false
+	}
+
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='movies')").Scan(&exists)
+	if err != nil || !exists {
+		fmt.Println("[x] Error checking movies table:", err)
+		return false
 	}
 
 	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='subtitles')").Scan(&exists)
-	if err != nil {
-		return false, err
+	if err != nil || !exists {
+		fmt.Println("[x] Error checking subtitles table:", err)
+		return false
 	}
 
-	return exists, nil
+	if exists {
+		fmt.Println("[+] Tables exist")
+		return exists
+	}
+
+	return false
 }
-
-
-	

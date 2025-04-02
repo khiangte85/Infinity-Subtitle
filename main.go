@@ -17,15 +17,14 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "infinity-subtitle",
-		Width:  1024,
-		Height: 768,
+		Title:      "infinity-subtitle",
+		Fullscreen: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		BackgroundColour: &options.RGBA{R: 173, G: 216, B: 230, A: 1},
 		OnStartup:        app.startup,
-		Bind: []interface{}{
+		Bind: []any{
 			app,
 		},
 	})

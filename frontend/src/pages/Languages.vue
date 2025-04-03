@@ -76,8 +76,9 @@
   </div>
   <q-table
     class="text-left"
-    flat
     color="primary"
+    flat
+    dense
     bordered
     :columns="columns"
     :rows="languages"

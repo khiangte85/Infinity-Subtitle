@@ -6,6 +6,18 @@ export function CreateMovie(arg1, arg2, arg3) {
   return window['go']['backend']['Movie']['CreateMovie'](arg1, arg2, arg3);
 }
 
+export function DeleteMovie(arg1) {
+  return window['go']['backend']['Movie']['DeleteMovie'](arg1);
+}
+
 export function GetMovieByID(arg1) {
   return window['go']['backend']['Movie']['GetMovieByID'](arg1);
+}
+
+export function ListMovies(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['backend']['Movie']['ListMovies'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function UpdateMovie(arg1, arg2, arg3, arg4) {
+  return window['go']['backend']['Movie']['UpdateMovie'](arg1, arg2, arg3, arg4);
 }

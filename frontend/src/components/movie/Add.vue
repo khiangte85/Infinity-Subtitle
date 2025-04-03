@@ -41,6 +41,31 @@
     errors.value = {};
     saving.value = true;
     try {
+      let languagesKV = languages.value.map((lang) => ({
+        [lang.code]: lang.name,
+      }));
+
+      languagesKV = languagesKV.filter((lang) =>{ 
+        const code = Object.keys(lang)[0];
+        return model.value.default_language == code || model.value.languages[code];
+      });
+
+      if (languagesKV.length === 0) {
+        errors.value = { error: 'At least one language is required' };
+        return;
+      }
+
+      const kv  = languagesKV.reduce((acc, lang) => {
+        const code = Object.keys(lang)[0];
+        const value = Object.values(lang)[0];
+        acc[code] = value;
+        return acc;
+      }, {});
+
+      console.log(kv);
+
+      model.value.languages = kv;
+
       await CreateMovie(
         model.value.title,
         model.value.default_language,

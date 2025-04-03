@@ -3,16 +3,17 @@
   import { ref } from 'vue';
   import { backend as models } from '../../wailsjs/go/models.js';
   import {
-    GetAllLanguages,
-  } from '../../wailsjs/go/backend/Language.js';
+    ListMovies,
+  } from '../../wailsjs/go/backend/Movie.js';
   import AddMovie from '../components/movie/Add.vue';
-
+  import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
   const loading = ref(true);
   const pagination = ref({
     rowsPerPage: 0,
   });
 
   const showDialog = ref(false);
+  const movies = ref<models.Movie[]>([]);
   const languages = ref<models.Language[]>([]);
 
   const columns: QTableColumn[] = [
@@ -24,28 +25,65 @@
       align: 'left',
     },
     {
-      name: 'name',
-      label: 'Name',
-      field: 'name',
+      name: 'title',
+      label: 'Title',
+      field: 'title',
       sortable: true,
       align: 'left',
     },
     {
-      name: 'code',
-      label: 'Code',
-      field: 'code',
+      name: 'default_language',
+      label: 'Default Language',
+      field: 'default_language',
       sortable: true,
       align: 'left',
+      format: (val: string) => {
+        const language = languages.value.find((language) => language.code === val);
+        return language ? language.name : '';
+      },
+    },
+    {
+      name: 'languages',
+      label: 'Subtitle Languages',
+      field: 'languages',
+      sortable: true,
+      align: 'left',
+      format: (val: string) => {
+        return Object.entries(val).map(([key, value]) => `${value}`).join(', ');
+      },
+    },
+    {
+      name: 'created_at',
+      label: 'Created At',
+      field: 'created_at',
+      sortable: true,
+      align: 'left',
+      format: (val: string) => {
+        return new Date(val).toLocaleString();
+      },
     },
   ];
 
-  const getLanguages = async () => {
+  const paginateMovies = async () => {
     try {
-      languages.value = await GetAllLanguages();
+      const response = await ListMovies('', '', false, 0, 10) as Record<string, any>;
+      movies.value = response.movies;
+      pagination.value.rowsPerPage = response.last_id;
     } catch (error) {
       console.error(error);
     } finally {
       loading.value = false;
+    }
+  };
+
+  const getLanguages = async () => {
+    try {
+      const response = await GetAllLanguages();
+      languages.value = response;
+
+      paginateMovies();
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -77,10 +115,11 @@
   <q-table
     class="text-left"
     flat
+    dense
     color="primary"
     bordered
     :columns="columns"
-    :rows="languages"
+    :rows="movies"
     :loading="loading"
     separator="cell"
     wrap-cells
@@ -94,7 +133,7 @@
       @onClose="showDialog = false"
       @onAdded="() => {
         showDialog = false;
-        getLanguages();
+        paginateMovies();
       }"
     />
   </q-dialog>

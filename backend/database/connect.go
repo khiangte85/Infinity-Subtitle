@@ -16,7 +16,7 @@ var defaultDb = &Database{}
 
 func (db *Database) Connect() (error) {
 	var err error
-	db.DB, err = sql.Open("sqlite3", "./database.db")
+	db.DB, err = sql.Open("sqlite3", "./infinity-subtitle.db")
 	if err != nil {
 		return err
 	}

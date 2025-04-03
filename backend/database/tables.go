@@ -32,10 +32,10 @@ func CreateTables() {
 	CREATE TABLE IF NOT EXISTS movies (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		title TEXT NOT NULL,
-		default_language_id INTEGER NOT NULL,
+		default_language	 TEXT NOT NULL,
 		languages JSON NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (default_language_id) REFERENCES languages(id)
+		FOREIGN KEY (default_language) REFERENCES languages(code)
 	)`)
 
 	if err != nil {
@@ -89,7 +89,7 @@ func InsertLanguages() {
 	('Indonesian', 'id'),
 	('Malay', 'ms'),
 	('Vietnamese', 'vi'),
-	('Hindi', 'hi'),
+	('Hindi', 'hi')
 	`)
 
 	if err != nil {

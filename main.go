@@ -16,6 +16,7 @@ func main() {
 	// Create an instance of the app structure
 	app := NewApp()
 	language := backend.NewLanguage()
+	movie := backend.NewMovie()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -29,6 +30,7 @@ func main() {
 		Bind: []any{
 			app,
 			language,
+			movie,
 		},
 		AlwaysOnTop: false,
 	})

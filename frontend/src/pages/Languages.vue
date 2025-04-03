@@ -1,27 +1,19 @@
 <script setup lang="ts">
   import { QTableColumn } from 'quasar';
-  import { reactive, ref } from 'vue';
-  import { backend as models} from '../../wailsjs/go/models.js';
-  import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
+  import { ref } from 'vue';
+  import { backend as models } from '../../wailsjs/go/models.js';
+  import {
+    GetAllLanguages,
+  } from '../../wailsjs/go/backend/Language.js';
+  import AddLanguage from '../components/language/Add.vue';
 
   const loading = ref(true);
   const pagination = ref({
     rowsPerPage: 0,
   });
 
+  const showDialog = ref(false);
   const languages = ref<models.Language[]>([]);
-
-  const getLanguages = async () => {
-    try {
-      languages.value = await GetAllLanguages();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      loading.value = false;
-    }
-  };
-
-  getLanguages();
 
   const columns: QTableColumn[] = [
     {
@@ -46,10 +38,42 @@
       align: 'left',
     },
   ];
+
+  const getLanguages = async () => {
+    try {
+      languages.value = await GetAllLanguages();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  getLanguages();
 </script>
 
 <template>
-  <h5 class="text-h5">Languages</h5>
+  <div class="q-pa-md row justify-between items-center">
+    <div>
+      <h5 class="text-h5">Languages</h5>
+    </div>
+    <div>
+      <q-btn
+        round
+        unelevated
+        color="primary"
+        icon="fas fa-plus"
+        size="sm"
+        @click="
+          () => {
+            showDialog = true;
+          }
+        "
+      >
+        <q-tooltip> Add Language </q-tooltip>
+      </q-btn>
+    </div>
+  </div>
   <q-table
     class="text-left"
     flat
@@ -64,4 +88,14 @@
     :pagination="pagination"
     :rows-per-page-options="[0]"
   />
+
+  <q-dialog v-model="showDialog">
+    <AddLanguage
+      @onClose="showDialog = false"
+      @onAdded="() => {
+        showDialog = false;
+        getLanguages();
+      }"
+    />
+  </q-dialog>
 </template>

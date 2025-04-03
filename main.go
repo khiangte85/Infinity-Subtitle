@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"infinity-subtitle/backend"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -14,6 +15,7 @@ var assets embed.FS
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
+	language := backend.NewLanguage()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -26,6 +28,7 @@ func main() {
 		OnStartup:        app.startup,
 		Bind: []any{
 			app,
+			language,
 		},
 		AlwaysOnTop: false,
 	})

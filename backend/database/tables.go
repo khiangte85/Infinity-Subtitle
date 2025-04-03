@@ -20,7 +20,7 @@ func CreateTables() {
 	CREATE TABLE IF NOT EXISTS languages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
-		code TEXT NOT NULL,
+		code TEXT NOT NULL UNIQUE,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 
@@ -70,8 +70,16 @@ func CreateTables() {
 		log.Fatal("[x] Error creating sl_no index:", err)
 	}
 
-	// Insert languages
-	_, err = tx.Exec(`
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal("[x] Error committing transaction:", err)
+	}
+}
+
+func InsertLanguages() {
+	db := GetDB()
+
+	_, err := db.Exec(`
 	INSERT INTO languages (name, code) VALUES 
 	('English', 'en'),
 	('Chinese', 'zh'),
@@ -81,16 +89,11 @@ func CreateTables() {
 	('Indonesian', 'id'),
 	('Malay', 'ms'),
 	('Vietnamese', 'vi'),
-	('Hindi', 'hi')
+	('Hindi', 'hi'),
 	`)
 
 	if err != nil {
-		log.Fatal("[x] Error inserting languages:", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Fatal("[x] Error committing transaction:", err)
+		log.Println("[x] Error inserting languages:", err)
 	}
 }
 

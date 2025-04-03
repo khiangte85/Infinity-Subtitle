@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"infinity-subtitle/database"
+	"infinity-subtitle/backend/database"
 )
 
 // App struct
@@ -30,10 +29,6 @@ func (a *App) startup(ctx context.Context) {
 	// Check if tables exist
 	if !database.CheckTablesExists() {
 		database.CreateTables()
+		database.InsertLanguages()
 	}
-}
-
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
 }

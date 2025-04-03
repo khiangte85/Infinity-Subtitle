@@ -1,17 +1,33 @@
 <script setup lang="ts">
   import { QTableColumn } from 'quasar';
-  import { ref, computed, nextTick } from 'vue';
+  import { reactive, ref } from 'vue';
+  import { backend as models} from '../../wailsjs/go/models.js';
+  import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
 
-  const loading = ref(false);
+  const loading = ref(true);
   const pagination = ref({
     rowsPerPage: 0,
   });
 
+  const languages = ref<models.Language[]>([]);
+
+  const getLanguages = async () => {
+    try {
+      languages.value = await GetAllLanguages();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  getLanguages();
+
   const columns: QTableColumn[] = [
     {
-      name: 'index',
+      name: 'id',
       label: '#',
-      field: 'index',
+      field: 'id',
       sortable: true,
       align: 'left',
     },
@@ -30,68 +46,22 @@
       align: 'left',
     },
   ];
-
-  const rows = [
-    {
-      index: 1,
-      name: 'English',
-      code: 'en',
-    },
-    {
-      index: 2,
-      name: 'Spanish',
-      code: 'es',
-    },
-    {
-      index: 3,
-      name: 'French',
-      code: 'fr',
-    },
-    {
-      index: 4,
-      name: 'German',
-      code: 'de',
-    },
-    {
-      index: 5,
-      name: 'Italian',
-      code: 'it',
-    },
-    {
-      index: 6,
-      name: 'Portuguese',
-      code: 'pt',
-    },
-    {
-      index: 7,
-      name: 'Russian',
-      code: 'ru',
-    },
-  ];
-
-  const onScroll = (event: any) => {
-    console.log(event);
-  };
 </script>
 
 <template>
   <h5 class="text-h5">Languages</h5>
   <q-table
-    class="my-sticky-dynamic text-left"
+    class="text-left"
     flat
     color="primary"
     bordered
     :columns="columns"
-    :rows="rows"
+    :rows="languages"
     :loading="loading"
     separator="cell"
     wrap-cells
-    row-key="index"
-    virtual-scroll
-    :virtual-scroll-item-size="5"
-    :virtual-scroll-sticky-size-start="5"
+    row-key="id"
     :pagination="pagination"
     :rows-per-page-options="[0]"
-    @virtual-scroll="onScroll"
   />
 </template>

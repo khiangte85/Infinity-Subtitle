@@ -91,7 +91,7 @@
 </script>
 
 <template>
-  <div class="q-pa-md row justify-between items-center">
+  <div class="q-py-md row justify-between items-center">
     <div>
       <h5 class="text-h5">Movies</h5>
     </div>

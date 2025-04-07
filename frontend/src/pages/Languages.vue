@@ -78,7 +78,6 @@
     class="text-left"
     color="primary"
     flat
-    dense
     bordered
     :columns="columns"
     :rows="languages"

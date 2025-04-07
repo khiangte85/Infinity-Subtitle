@@ -1,15 +1,20 @@
 <script setup lang="ts">
   import { QTableColumn } from 'quasar';
-  import { ref } from 'vue';
+  import { onMounted, ref, watch } from 'vue';
   import { backend as models } from '../../wailsjs/go/models.js';
-  import {
-    ListMovies,
-  } from '../../wailsjs/go/backend/Movie.js';
+  import { ListMovies } from '../../wailsjs/go/backend/Movie.js';
   import AddMovie from '../components/movie/Add.vue';
   import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
   const loading = ref(true);
-  const pagination = ref({
-    rowsPerPage: 0,
+  const pagination = ref<models.Pagination>({
+    sortBy: 'created_at',
+    descending: true,
+    page: 1,
+    rowsPerPage: 10,
+    rowsNumber: 0,
+  });
+  const filter = ref({
+    title: '',
   });
 
   const showDialog = ref(false);
@@ -38,7 +43,9 @@
       sortable: true,
       align: 'left',
       format: (val: string) => {
-        const language = languages.value.find((language) => language.code === val);
+        const language = languages.value.find(
+          (language) => language.code === val
+        );
         return language ? language.name : '';
       },
     },
@@ -49,7 +56,9 @@
       sortable: true,
       align: 'left',
       format: (val: string) => {
-        return Object.entries(val).map(([key, value]) => `${value}`).join(', ');
+        return Object.entries(val)
+          .map(([key, value]) => `${value}`)
+          .join(', ');
       },
     },
     {
@@ -62,13 +71,24 @@
         return new Date(val).toLocaleString();
       },
     },
+    {
+      name: 'actions',
+      label: 'Actions',
+      field: 'actions',
+      align: 'left',
+      sortable: false,
+    },
   ];
 
-  const paginateMovies = async () => {
+  onMounted(async () => {
+    onRequest({ pagination: pagination.value, filter: filter.value });
+  });
+
+  const paginateMovies = async (props: any) => {
     try {
-      const response = await ListMovies('', '', false, 0, 10) as Record<string, any>;
+      const response = await ListMovies(props.filter.title, props.pagination);
       movies.value = response.movies;
-      pagination.value.rowsPerPage = response.last_id;
+      return response;
     } catch (error) {
       console.error(error);
     } finally {
@@ -76,12 +96,22 @@
     }
   };
 
+  const onRequest = async (props: any) => {
+    console.log(props);
+    const { page, rowsPerPage, sortBy, descending } = props.pagination;
+    props.filter = filter.value;
+    const response = await paginateMovies(props);
+    pagination.value.page = page;
+    pagination.value.rowsPerPage = rowsPerPage;
+    pagination.value.rowsNumber = response?.pagination.rowsNumber ?? 0;
+    pagination.value.sortBy = sortBy;
+    pagination.value.descending = descending;
+  };
+
   const getLanguages = async () => {
     try {
       const response = await GetAllLanguages();
       languages.value = response;
-
-      paginateMovies();
     } catch (error) {
       console.error(error);
     }
@@ -91,11 +121,15 @@
 </script>
 
 <template>
-  <div class="q-py-md row justify-between items-center">
-    <div>
+  <q-card
+    flat
+    class="full-width row justify-between items-center"
+  >
+    <q-card-section class="q-py-sm q-pl-none">
       <h5 class="text-h5">Movies</h5>
-    </div>
-    <div>
+    </q-card-section>
+    <q-space />
+    <q-card-section class="q-py-sm">
       <q-btn
         round
         unelevated
@@ -110,31 +144,104 @@
       >
         <q-tooltip> Add Movie </q-tooltip>
       </q-btn>
-    </div>
-  </div>
+    </q-card-section>
+  </q-card>
+
+  <q-card
+    flat
+    bordered
+    class="full-width q-mb-md"
+  >
+    <q-card-section class="row q-py-lg">
+      <q-input
+        class="q-ml-md"
+        dense
+        outlined
+        debounce="300"
+        v-model="filter.title"
+        autocomplete="off"
+        clearable
+        placeholder="Search"
+        :style="{ minWidth: '400px', maxWidth: '600px' }"
+      />
+
+      <q-btn
+        class="q-mx-md"
+        :round="true"
+        unelevated
+        icon="fas fa-filter-circle-xmark"
+        color="primary"
+        @click="
+          () => {
+            filter.title = '';
+            onRequest({
+              pagination: { ...pagination },
+              filter: { ...filter },
+            });
+          }
+        "
+      >
+        <q-tooltip>Clear</q-tooltip>
+      </q-btn>
+    </q-card-section>
+  </q-card>
+
   <q-table
     class="text-left"
     flat
-    dense
     color="primary"
     bordered
     :columns="columns"
     :rows="movies"
+    :filter="filter"
     :loading="loading"
     separator="cell"
     wrap-cells
     row-key="id"
-    :pagination="pagination"
-    :rows-per-page-options="[0]"
-  />
+    v-model:pagination="pagination"
+    :rows-per-page-options="[10, 20, 50]"
+    binary-state-sort
+    rows-per-page-label="Records per page"
+    @request="onRequest"
+  >
+    <template v-slot:body-cell-actions="props">
+      <q-td
+        :props="props"
+        style="min-width: 120px"
+      >
+        <q-btn
+          round
+          unelevated
+          color="primary"
+          icon="fas fa-edit"
+          size="sm"
+        >
+          <q-tooltip>Edit</q-tooltip>
+        </q-btn>
+
+        <q-btn
+          class="q-ml-sm"
+          round
+          unelevated
+          color="primary"
+          icon="fas fa-closed-captioning"
+          size="sm"
+        >
+          <q-tooltip>Subtitles</q-tooltip>
+        </q-btn>
+      </q-td>
+    </template>
+  </q-table>
 
   <q-dialog v-model="showDialog">
     <AddMovie
       @onClose="showDialog = false"
-      @onAdded="() => {
-        showDialog = false;
-        paginateMovies();
-      }"
+      @onAdded="
+        () => {
+          showDialog = false;
+          onRequest({ pagination: { ...pagination }, filter: { ...filter } });
+        }
+      "
     />
   </q-dialog>
 </template>

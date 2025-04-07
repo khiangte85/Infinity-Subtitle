@@ -37,6 +37,26 @@ export namespace backend {
 		    return a;
 		}
 	}
+	export class Pagination {
+	    sortBy: string;
+	    descending: boolean;
+	    page: number;
+	    rowsPerPage: number;
+	    rowsNumber: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Pagination(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sortBy = source["sortBy"];
+	        this.descending = source["descending"];
+	        this.page = source["page"];
+	        this.rowsPerPage = source["rowsPerPage"];
+	        this.rowsNumber = source["rowsNumber"];
+	    }
+	}
 	export class Movie {
 	    id: number;
 	    title: string;
@@ -78,7 +98,7 @@ export namespace backend {
 	}
 	export class ListMoviesResponse {
 	    movies: Movie[];
-	    last_id: number;
+	    pagination: Pagination;
 	
 	    static createFrom(source: any = {}) {
 	        return new ListMoviesResponse(source);
@@ -87,7 +107,7 @@ export namespace backend {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.movies = this.convertValues(source["movies"], Movie);
-	        this.last_id = source["last_id"];
+	        this.pagination = this.convertValues(source["pagination"], Pagination);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -108,6 +128,7 @@ export namespace backend {
 		    return a;
 		}
 	}
+	
 
 }
 

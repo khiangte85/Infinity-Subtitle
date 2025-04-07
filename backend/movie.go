@@ -4,17 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"infinity-subtitle/backend/database"
-	"log"
-	"strings"
 	"time"
 )
 
 type Movie struct {
-	ID                int               `json:"id"`
-	Title             string            `json:"title"`
-	DefaultLanguage   string            `json:"default_language"`
-	Languages         map[string]string `json:"languages"`
-	CreatedAt         time.Time         `json:"created_at"`
+	ID              int               `json:"id"`
+	Title           string            `json:"title"`
+	DefaultLanguage string            `json:"default_language"`
+	Languages       map[string]string `json:"languages"`
+	CreatedAt       time.Time         `json:"created_at"`
+}
+
+type ListMoviesResponse struct {
+	Movies     []Movie    `json:"movies"`
+	Pagination Pagination `json:"pagination"`
 }
 
 func NewMovie() *Movie {
@@ -93,15 +96,25 @@ func (m *Movie) DeleteMovie(id int) error {
 	return err
 }
 
-type ListMoviesResponse struct {
-	Movies []Movie `json:"movies"`
-	LastID int64   `json:"last_id"`
-}
-
-func (m *Movie) ListMovies(title string, sortBy string, sortDesc bool, lastID int64, limit int) (*ListMoviesResponse, error) {
+func (m *Movie) ListMovies(title string, pagination Pagination) (*ListMoviesResponse, error) {
 	db := database.GetDB()
-	query := "SELECT * FROM movies"
+
+	query := "SELECT COUNT(id) FROM movies"
 	args := []any{}
+	if title != "" {
+		query += " WHERE title LIKE ?"
+		args = append(args, "%"+title+"%")
+	}
+	row := db.QueryRow(query, args...)
+	var rowsNumber int
+	err := row.Scan(&rowsNumber)
+	if err != nil {
+		return nil, err
+	}
+	pagination.RowsNumber = rowsNumber
+
+	query = "SELECT * FROM movies"
+	args = []any{}
 
 	// Handle search by title if provided
 	if title != "" {
@@ -110,36 +123,20 @@ func (m *Movie) ListMovies(title string, sortBy string, sortDesc bool, lastID in
 	}
 
 	// Handle sorting
-	if sortBy != "" {
-		query += " ORDER BY " + sortBy
-		if sortDesc {
+	if pagination.SortBy != "" {
+		query += " ORDER BY " + pagination.SortBy
+		if pagination.Descending {
 			query += " DESC"
 		} else {
-			query += " ASC" 
+			query += " ASC"
 		}
 	}
 
-	// Add cursor pagination
-	if lastID > 0 {
-		if strings.Contains(query, "WHERE") {
-			query += " AND"
-		} else {
-			query += " WHERE"
-		}
-		
-		if sortDesc {
-			query += " id < ?"
-		} else {
-			query += " id > ?"
-		}
-		args = append(args, lastID)
-	}
+	// Add pagination
+	offset := (pagination.Page - 1) * pagination.RowsPerPage
+	query += " LIMIT ? OFFSET ?"
+	args = append(args, pagination.RowsPerPage, offset)
 
-	// Add limit
-	query += " LIMIT ?"
-	args = append(args, limit)
-
-	
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -155,28 +152,20 @@ func (m *Movie) ListMovies(title string, sortBy string, sortDesc bool, lastID in
 			return nil, err
 		}
 
-		
 		err = json.Unmarshal(languages, &movie.Languages)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		movies = append(movies, movie)
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	
-	var lastMovieID int64
-	if len(movies) > 0 {
-		log.Printf("Movies %+v", movies)
-		lastMovieID = int64(movies[len(movies)-1].ID)
-		log.Printf("Last Movie ID %d", lastMovieID)
-	}
 
 	return &ListMoviesResponse{
-		Movies: movies,
-		LastID: lastMovieID,
+		Movies:     movies,
+		Pagination: pagination,
 	}, nil
 }

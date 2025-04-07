@@ -14,8 +14,8 @@ export function GetMovieByID(arg1) {
   return window['go']['backend']['Movie']['GetMovieByID'](arg1);
 }
 
-export function ListMovies(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['backend']['Movie']['ListMovies'](arg1, arg2, arg3, arg4, arg5);
+export function ListMovies(arg1, arg2) {
+  return window['go']['backend']['Movie']['ListMovies'](arg1, arg2);
 }
 
 export function UpdateMovie(arg1, arg2, arg3, arg4) {

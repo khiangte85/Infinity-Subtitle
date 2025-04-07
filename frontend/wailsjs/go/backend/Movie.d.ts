@@ -8,6 +8,6 @@ export function DeleteMovie(arg1:number):Promise<void>;
 
 export function GetMovieByID(arg1:number):Promise<backend.Movie>;
 
-export function ListMovies(arg1:string,arg2:string,arg3:boolean,arg4:number,arg5:number):Promise<backend.ListMoviesResponse>;
+export function ListMovies(arg1:string,arg2:backend.Pagination):Promise<backend.ListMoviesResponse>;
 
 export function UpdateMovie(arg1:number,arg2:string,arg3:string,arg4:Record<string, string>):Promise<void>;

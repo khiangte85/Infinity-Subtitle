@@ -47,7 +47,11 @@ func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[
 
 	db := database.GetDB()
 
-	_, err = db.Exec("INSERT INTO movies (title, default_language, languages) VALUES (?, ?, ?)", m.Title, m.DefaultLanguage, jsonLanguages)
+	_, err = db.Exec("INSERT INTO movies (title, default_language, languages) VALUES (?, ?, ?)",
+		m.Title,
+		m.DefaultLanguage,
+		jsonLanguages,
+	)
 	if err != nil {
 		return err
 	}
@@ -58,31 +62,34 @@ func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[
 func (m *Movie) GetMovieByID(id int) (*Movie, error) {
 	db := database.GetDB()
 	row := db.QueryRow("SELECT * FROM movies WHERE id = ?", id)
-	var movie Movie
 	var languages []byte
 
-	err := row.Scan(&movie.ID, &movie.Title, &movie.DefaultLanguage, &languages, &movie.CreatedAt)
+	err := row.Scan(&m.ID, &m.Title, &m.DefaultLanguage, &languages, &m.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal(languages, &movie.Languages)
+	err = json.Unmarshal(languages, &m.Languages)
 	if err != nil {
 		return nil, err
 	}
 
-	return &movie, nil
+	return m, nil
 }
 
-func (m *Movie) UpdateMovie(id int, title string, defaultLanguage string, languages map[string]string) error {
+func (m *Movie) UpdateMovie(movie Movie) error {
 	db := database.GetDB()
 
-	jsonLanguages, err := json.Marshal(languages)
+	jsonLanguages, err := json.Marshal(movie.Languages)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE movies SET title = ?, default_language = ?, languages = ? WHERE id = ?", m.Title, m.DefaultLanguage, jsonLanguages, id)
+	_, err = db.Exec("UPDATE movies SET title = ?, default_language = ?, languages = ? WHERE id = ?", 
+		movie.Title, 
+		movie.DefaultLanguage, 
+		jsonLanguages, 
+		movie.ID)
 	if err != nil {
 		return err
 	}

@@ -10,4 +10,4 @@ export function GetMovieByID(arg1:number):Promise<backend.Movie>;
 
 export function ListMovies(arg1:string,arg2:backend.Pagination):Promise<backend.ListMoviesResponse>;
 
-export function UpdateMovie(arg1:number,arg2:string,arg3:string,arg4:Record<string, string>):Promise<void>;
+export function UpdateMovie(arg1:backend.Movie):Promise<void>;

@@ -4,8 +4,12 @@
   import { backend as models } from '../../wailsjs/go/models.js';
   import { ListMovies } from '../../wailsjs/go/backend/Movie.js';
   import AddMovie from '../components/movie/Add.vue';
+  import EditMovie from '../components/movie/Edit.vue';
   import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
+
   const loading = ref(true);
+  const showEdit = ref(false);
+  const selectedMovie = ref<models.Movie>();
   const pagination = ref<models.Pagination>({
     sortBy: 'created_at',
     descending: true,
@@ -17,7 +21,7 @@
     title: '',
   });
 
-  const showDialog = ref(false);
+  const showAdd = ref(false);
   const movies = ref<models.Movie[]>([]);
   const languages = ref<models.Language[]>([]);
 
@@ -81,13 +85,14 @@
   ];
 
   onMounted(async () => {
+    getLanguages();
     onRequest({ pagination: pagination.value, filter: filter.value });
   });
 
   const paginateMovies = async (props: any) => {
     try {
       const response = await ListMovies(props.filter.title, props.pagination);
-      movies.value = response.movies;
+      movies.value = response.movies ?? [];
       return response;
     } catch (error) {
       console.error(error);
@@ -116,8 +121,6 @@
       console.error(error);
     }
   };
-
-  getLanguages();
 </script>
 
 <template>
@@ -138,7 +141,7 @@
         size="sm"
         @click="
           () => {
-            showDialog = true;
+            showAdd = true;
           }
         "
       >
@@ -215,6 +218,12 @@
           color="primary"
           icon="fas fa-edit"
           size="sm"
+          @click="
+            () => {
+              selectedMovie = props.row;
+              showEdit = true;
+            }
+          "
         >
           <q-tooltip>Edit</q-tooltip>
         </q-btn>
@@ -233,12 +242,25 @@
     </template>
   </q-table>
 
-  <q-dialog v-model="showDialog">
+  <q-dialog v-model="showAdd">
     <AddMovie
-      @onClose="showDialog = false"
+      @onClose="showAdd = false"
       @onAdded="
         () => {
-          showDialog = false;
+          showAdd = false;
+          onRequest({ pagination: { ...pagination }, filter: { ...filter } });
+        }
+      "
+    />
+  </q-dialog>
+
+  <q-dialog v-model="showEdit">
+    <EditMovie
+      :movie="selectedMovie as models.Movie"
+      @onClose="showEdit = false"
+      @onUpdated="
+        () => {
+          showEdit = false;
           onRequest({ pagination: { ...pagination }, filter: { ...filter } });
         }
       "

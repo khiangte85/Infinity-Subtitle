@@ -2,26 +2,26 @@
   import { ref, onMounted } from 'vue';
   import { useQuasar } from 'quasar';
   import { backend as models } from '../../../wailsjs/go/models.js';
-  import { CreateMovie } from '../../../wailsjs/go/backend/Movie.js';
+  import { CreateMovie, UpdateMovie } from '../../../wailsjs/go/backend/Movie.js';
   import { GetAllLanguages } from '../../../wailsjs/go/backend/Language.js';
   import Error from '../Error.vue';
 
   const $q = useQuasar();
-  const emit = defineEmits(['onClose', 'onAdded']);
+  const emit = defineEmits(['onClose', 'onUpdated']);
+  const props = defineProps<{
+    movie: models.Movie;
+  }>();
+
+  console.log(Object.keys(props.movie.languages));
 
   const saving = ref(false);
 
-  const model = ref(
-    new models.Movie({
-      id: 0,
-      title: '',
-      default_language: 'en',
-      languages: {},
-      created_at: '',
-    })
-  );
+  const model = ref<models.Movie>(new models.Movie({
+    ...props.movie,
+    languages: Object.keys(props.movie.languages),
+  }));
 
-  const selectedLanguages = ref<string[]>([]);
+  const selectedLanguages = ref<string[]>([...Object.keys(props.movie.languages)]);
 
   const languages = ref<models.Language[]>([]);
 
@@ -57,13 +57,9 @@
 
       model.value.languages = languagesKV;
 
-      await CreateMovie(
-        model.value.title,
-        model.value.default_language,
-        model.value.languages
-      );
+      await UpdateMovie(model.value);
 
-      emit('onAdded');
+      emit('onUpdated');
     } catch (err: any) {
       errors.value = { error: err };
     } finally {
@@ -83,7 +79,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Add Movie</span>
+      <span class="text-body2">Edit Movie</span>
       <q-space />
       <q-btn
         dense

@@ -18,6 +18,6 @@ export function ListMovies(arg1, arg2) {
   return window['go']['backend']['Movie']['ListMovies'](arg1, arg2);
 }
 
-export function UpdateMovie(arg1, arg2, arg3, arg4) {
-  return window['go']['backend']['Movie']['UpdateMovie'](arg1, arg2, arg3, arg4);
+export function UpdateMovie(arg1) {
+  return window['go']['backend']['Movie']['UpdateMovie'](arg1);
 }

@@ -3,7 +3,9 @@ package backend
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"infinity-subtitle/backend/database"
+	"strings"
 	"time"
 )
 
@@ -21,15 +23,18 @@ type ListMoviesResponse struct {
 }
 
 func NewMovie() *Movie {
-	return &Movie{}
+	return &Movie{
+		Languages: make(map[string]string),
+	}
 }
 
 func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[string]string) error {
-	if title == "" {
+	// Input validation
+	if strings.TrimSpace(title) == "" {
 		return errors.New("title is required")
 	}
 
-	if defaultLanguage == "" {
+	if strings.TrimSpace(defaultLanguage) == "" {
 		return errors.New("default language is required")
 	}
 
@@ -39,13 +44,16 @@ func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[
 
 	jsonLanguages, err := json.Marshal(languages)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal languages: %w", err)
 	}
 
 	m.Title = title
 	m.DefaultLanguage = defaultLanguage
 
 	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection is nil")
+	}
 
 	_, err = db.Exec("INSERT INTO movies (title, default_language, languages) VALUES (?, ?, ?)",
 		m.Title,
@@ -53,43 +61,119 @@ func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[
 		jsonLanguages,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to insert movie: %w", err)
 	}
 
 	return nil
 }
 
 func (m *Movie) GetMovieByID(id int) (*Movie, error) {
+	if id <= 0 {
+		return nil, errors.New("invalid movie ID")
+	}
+
 	db := database.GetDB()
-	row := db.QueryRow("SELECT * FROM movies WHERE id = ?", id)
+	if db == nil {
+		return nil, errors.New("database connection is nil")
+	}
+
+	// Only select needed fields
+	row := db.QueryRow("SELECT id, title, default_language, languages, created_at FROM movies WHERE id = ?", id)
 	var languages []byte
 
 	err := row.Scan(&m.ID, &m.Title, &m.DefaultLanguage, &languages, &m.CreatedAt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to scan movie: %w", err)
 	}
 
 	err = json.Unmarshal(languages, &m.Languages)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal languages: %w", err)
 	}
 
 	return m, nil
 }
 
 func (m *Movie) UpdateMovie(movie Movie) error {
+	if movie.ID <= 0 {
+		return errors.New("invalid movie ID")
+	}
+
 	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection is nil")
+	}
 
 	jsonLanguages, err := json.Marshal(movie.Languages)
+	if err != nil {
+		return fmt.Errorf("failed to marshal languages: %w", err)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec("UPDATE movies SET title = ?, default_language = ?, languages = ? WHERE id = ?",
+		movie.Title,
+		movie.DefaultLanguage,
+		jsonLanguages,
+		movie.ID)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE movies SET title = ?, default_language = ?, languages = ? WHERE id = ?", 
-		movie.Title, 
-		movie.DefaultLanguage, 
-		jsonLanguages, 
-		movie.ID)
+	// rows, err := tx.Query("SELECT * FROM subtitles WHERE movie_id = ?", movie.ID)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer rows.Close()
+
+	// for rows.Next() {
+	// 	var subtitle Subtitle
+	// 	var contentBytes []byte
+	// 	err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &subtitle.SlNo, &subtitle.StartTime, &subtitle.EndTime, &contentBytes, &subtitle.CreatedAt, &subtitle.UpdatedAt)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	err = json.Unmarshal(contentBytes, &subtitle.Content)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	// Update content, if language key doesnt exist, add key with empty value
+	// 	for key := range movie.Languages {
+	// 		// check if key exists in content
+	// 		if _, ok := subtitle.Content[key]; !ok {
+	// 			subtitle.Content[key] = ""
+	// 		}
+	// 	}
+
+	// 	// if language key removed, remove key from content
+	// 	for key := range subtitle.Content {
+	// 		if _, ok := movie.Languages[key]; !ok {
+	// 			delete(subtitle.Content, key)
+	// 		}
+	// 	}
+
+	// 	// update subtitle
+	// 	contentJson, err := json.Marshal(subtitle.Content)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	_, err = tx.Exec("UPDATE subtitles SET content = ? WHERE id = ?", contentJson, subtitle.ID)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}

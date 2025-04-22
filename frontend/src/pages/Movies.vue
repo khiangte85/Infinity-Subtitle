@@ -6,7 +6,9 @@
   import AddMovie from '../components/movie/Add.vue';
   import EditMovie from '../components/movie/Edit.vue';
   import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
+  import { useRouter } from 'vue-router';
 
+  const router = useRouter();
   const loading = ref(true);
   const showEdit = ref(false);
   const selectedMovie = ref<models.Movie>();
@@ -235,6 +237,7 @@
           color="primary"
           icon="fas fa-closed-captioning"
           size="sm"
+          :to="`/movies/${props.row.id}/subtitles`"
         >
           <q-tooltip>Subtitles</q-tooltip>
         </q-btn>

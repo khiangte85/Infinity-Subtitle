@@ -7,6 +7,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       title: 'Dashboard',
       icon: 'fas fa-tv',
+      show: true,
     },
     component: () => import('../pages/Dashboard.vue'),
   },
@@ -16,8 +17,19 @@ const routes: RouteRecordRaw[] = [
     meta: {
       title: 'Movies',
       icon: 'fas fa-film',
+      show: true,
     },
     component: () => import('../pages/Movies.vue'),
+  },
+  {
+    path: '/movies/:id/subtitles',
+    name: 'Subtitles',
+    meta: {
+      title: 'Subtitles',
+      icon: 'fas fa-closed-captioning',
+      show: false,
+    },
+    component: () => import('../pages/Subtitle.vue'),
   },
   {
     path: '/languages',
@@ -25,6 +37,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       title: 'Languages',
       icon: 'fas fa-language',
+      show: true,
     },
     component: () => import('../pages/Languages.vue'),
   },

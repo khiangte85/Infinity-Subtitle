@@ -28,6 +28,7 @@
       :key="key"
     >
       <q-item
+        v-if="route.meta?.show"
         :to="route.path"
         clickable
         active-class="active-route-link active-menu-link"

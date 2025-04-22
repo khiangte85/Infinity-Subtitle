@@ -113,10 +113,12 @@
 
     <q-card-section class="q-pb-none">
       <q-select
+        :disabled="true"
+        :readonly="true"
         :autofocus="true"
         v-model="model.default_language"
         :options="languages"
-        label="Default Language"
+        label="Default Subtitle Language"
         emit-value
         map-options
         option-label="name"

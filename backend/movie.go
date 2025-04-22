@@ -29,7 +29,7 @@ func NewMovie() *Movie {
 	}
 }
 
-func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[string]string) error {
+func (m Movie) CreateMovie(title string, defaultLanguage string, languages map[string]string) error {
 	// Input validation
 	if strings.TrimSpace(title) == "" {
 		return errors.New("title is required")
@@ -68,8 +68,7 @@ func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[
 	return nil
 }
 
-func (m *Movie) GetMovieByID(id int) (*Movie, error) {
-	var movie Movie
+func (m Movie) GetMovieByID(id int) (*Movie, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid movie ID")
 	}
@@ -83,20 +82,20 @@ func (m *Movie) GetMovieByID(id int) (*Movie, error) {
 	row := db.QueryRow("SELECT * FROM movies WHERE id = ?", id)
 	var languages []byte
 
-	err := row.Scan(&movie.ID, &movie.Title, &movie.DefaultLanguage, &languages, &movie.CreatedAt, &movie.UpdatedAt)
+	err := row.Scan(&m.ID, &m.Title, &m.DefaultLanguage, &languages, &m.CreatedAt, &m.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan movie: %w", err)
 	}
 
-	err = json.Unmarshal(languages, &movie.Languages)
+	err = json.Unmarshal(languages, &m.Languages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal languages: %w", err)
 	}
 
-	return &movie, nil
+	return &m, nil
 }
 
-func (m *Movie) UpdateMovie(movie Movie) error {
+func (m Movie) UpdateMovie(movie Movie) error {
 	if movie.ID <= 0 {
 		return errors.New("invalid movie ID")
 	}
@@ -138,13 +137,13 @@ func (m *Movie) UpdateMovie(movie Movie) error {
 	return nil
 }
 
-func (m *Movie) DeleteMovie(id int) error {
+func (m Movie) DeleteMovie(id int) error {
 	db := database.GetDB()
 	_, err := db.Exec("DELETE FROM movies WHERE id = ?", id)
 	return err
 }
 
-func (m *Movie) ListMovies(title string, pagination Pagination) (*ListMoviesResponse, error) {
+func (m Movie) ListMovies(title string, pagination Pagination) (*ListMoviesResponse, error) {
 	db := database.GetDB()
 
 	query := "SELECT COUNT(id) FROM movies"

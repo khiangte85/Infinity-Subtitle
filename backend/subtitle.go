@@ -27,7 +27,7 @@ func NewSubtitle() *Subtitle {
 	return &Subtitle{}
 }
 
-func (s *Subtitle) GetSubtitlesByMovieID(movieID int) ([]Subtitle, error) {
+func (s Subtitle) GetSubtitlesByMovieID(movieID int) ([]Subtitle, error) {
 	db := database.GetDB()
 	var subtitles []Subtitle
 
@@ -56,7 +56,7 @@ func (s *Subtitle) GetSubtitlesByMovieID(movieID int) ([]Subtitle, error) {
 	return subtitles, nil
 }
 
-func (s *Subtitle) UpdateSubtitle(subtitle Subtitle) error {
+func (s Subtitle) UpdateSubtitle(subtitle Subtitle) error {
 	db := database.GetDB()
 	if db == nil {
 		return errors.New("database connection is nil")
@@ -75,7 +75,7 @@ func (s *Subtitle) UpdateSubtitle(subtitle Subtitle) error {
 	return nil
 }
 
-func (s *Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
+func (s Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
 	db := database.GetDB()
 	if db == nil {
 		return errors.New("database connection is nil")
@@ -132,8 +132,6 @@ func (s *Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
 			subtitle.Content[key] = ""
 		}
 	}
-
-	fmt.Printf("subtitle: %+v\n", subtitles)
 
 	// delete all subtitles for the movie
 	var err error

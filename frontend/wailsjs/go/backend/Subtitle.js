@@ -9,3 +9,7 @@ export function GetSubtitlesByMovieID(arg1) {
 export function UpdateSubtitle(arg1) {
   return window['go']['backend']['Subtitle']['UpdateSubtitle'](arg1);
 }
+
+export function UploadSRTFile(arg1, arg2) {
+  return window['go']['backend']['Subtitle']['UploadSRTFile'](arg1, arg2);
+}

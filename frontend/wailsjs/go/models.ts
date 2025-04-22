@@ -64,6 +64,8 @@ export namespace backend {
 	    languages: Record<string, string>;
 	    // Go type: time
 	    created_at: any;
+	    // Go type: time
+	    updated_at: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new Movie(source);
@@ -76,6 +78,7 @@ export namespace backend {
 	        this.default_language = source["default_language"];
 	        this.languages = source["languages"];
 	        this.created_at = this.convertValues(source["created_at"], null);
+	        this.updated_at = this.convertValues(source["updated_at"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

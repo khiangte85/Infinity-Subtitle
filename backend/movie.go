@@ -15,6 +15,7 @@ type Movie struct {
 	DefaultLanguage string            `json:"default_language"`
 	Languages       map[string]string `json:"languages"`
 	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
 }
 
 type ListMoviesResponse struct {
@@ -68,6 +69,7 @@ func (m *Movie) CreateMovie(title string, defaultLanguage string, languages map[
 }
 
 func (m *Movie) GetMovieByID(id int) (*Movie, error) {
+	var movie Movie
 	if id <= 0 {
 		return nil, errors.New("invalid movie ID")
 	}
@@ -78,20 +80,20 @@ func (m *Movie) GetMovieByID(id int) (*Movie, error) {
 	}
 
 	// Only select needed fields
-	row := db.QueryRow("SELECT id, title, default_language, languages, created_at FROM movies WHERE id = ?", id)
+	row := db.QueryRow("SELECT * FROM movies WHERE id = ?", id)
 	var languages []byte
 
-	err := row.Scan(&m.ID, &m.Title, &m.DefaultLanguage, &languages, &m.CreatedAt)
+	err := row.Scan(&movie.ID, &movie.Title, &movie.DefaultLanguage, &languages, &movie.CreatedAt, &movie.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan movie: %w", err)
 	}
 
-	err = json.Unmarshal(languages, &m.Languages)
+	err = json.Unmarshal(languages, &movie.Languages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal languages: %w", err)
 	}
 
-	return m, nil
+	return &movie, nil
 }
 
 func (m *Movie) UpdateMovie(movie Movie) error {
@@ -127,51 +129,6 @@ func (m *Movie) UpdateMovie(movie Movie) error {
 	if err != nil {
 		return err
 	}
-
-	// rows, err := tx.Query("SELECT * FROM subtitles WHERE movie_id = ?", movie.ID)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer rows.Close()
-
-	// for rows.Next() {
-	// 	var subtitle Subtitle
-	// 	var contentBytes []byte
-	// 	err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &subtitle.SlNo, &subtitle.StartTime, &subtitle.EndTime, &contentBytes, &subtitle.CreatedAt, &subtitle.UpdatedAt)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	err = json.Unmarshal(contentBytes, &subtitle.Content)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	// Update content, if language key doesnt exist, add key with empty value
-	// 	for key := range movie.Languages {
-	// 		// check if key exists in content
-	// 		if _, ok := subtitle.Content[key]; !ok {
-	// 			subtitle.Content[key] = ""
-	// 		}
-	// 	}
-
-	// 	// if language key removed, remove key from content
-	// 	for key := range subtitle.Content {
-	// 		if _, ok := movie.Languages[key]; !ok {
-	// 			delete(subtitle.Content, key)
-	// 		}
-	// 	}
-
-	// 	// update subtitle
-	// 	contentJson, err := json.Marshal(subtitle.Content)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	_, err = tx.Exec("UPDATE subtitles SET content = ? WHERE id = ?", contentJson, subtitle.ID)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
 
 	err = tx.Commit()
 	if err != nil {
@@ -238,7 +195,7 @@ func (m *Movie) ListMovies(title string, pagination Pagination) (*ListMoviesResp
 	for rows.Next() {
 		var movie Movie
 		var languages []byte
-		err := rows.Scan(&movie.ID, &movie.Title, &movie.DefaultLanguage, &languages, &movie.CreatedAt)
+		err := rows.Scan(&movie.ID, &movie.Title, &movie.DefaultLanguage, &languages, &movie.CreatedAt, &movie.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}

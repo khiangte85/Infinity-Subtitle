@@ -5,3 +5,5 @@ import {backend} from '../models';
 export function GetSubtitlesByMovieID(arg1:number):Promise<Array<backend.Subtitle>>;
 
 export function UpdateSubtitle(arg1:backend.Subtitle):Promise<void>;
+
+export function UploadSRTFile(arg1:backend.Movie,arg2:string):Promise<void>;

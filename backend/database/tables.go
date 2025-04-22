@@ -35,6 +35,7 @@ func CreateTables() {
 		default_language	 TEXT NOT NULL,
 		languages JSON NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (default_language) REFERENCES languages(code)
 	)`)
 

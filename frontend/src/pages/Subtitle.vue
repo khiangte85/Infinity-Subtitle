@@ -1,22 +1,20 @@
 <script setup lang="ts">
   import { QTableColumn } from 'quasar';
-  import { onMounted, ref, watch } from 'vue';
+  import { onMounted, ref } from 'vue';
   import { backend as models } from '../../wailsjs/go/models.js';
   import { GetMovieByID } from '../../wailsjs/go/backend/Movie.js';
   import { GetSubtitlesByMovieID } from '../../wailsjs/go/backend/Subtitle.js';
-  import AddMovie from '../components/movie/Add.vue';
-  import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
+  import ImportSubtitle from '../components/subtitle/Import.vue';
   import { useRouter } from 'vue-router';
 
   const router = useRouter();
   const movieId = router.currentRoute.value.params.id;
-  const loading = ref(true);
-  const showEdit = ref(false);
 
-  const showAdd = ref(false);
+  const loading = ref(true);
+  const showImport = ref(false);
+
   const movie = ref<models.Movie>();
   const subtitles = ref<models.Subtitle[]>([]);
-  const languages = ref<models.Language[]>([]);
   const columns = ref<QTableColumn[]>([]);
 
   interface SubtitleRow {
@@ -29,7 +27,6 @@
   const rows = ref<SubtitleRow[]>([]);
 
   onMounted(async () => {
-    getLanguages();
     getMovie();
     getSubtitles();
   });
@@ -52,18 +49,8 @@
     }
   };
 
-  const getLanguages = async () => {
-    try {
-      const response = await GetAllLanguages();
-      languages.value = response;
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   const setupColumns = () => {
-    const currentMovie = movie.value;
-    if (!currentMovie?.default_language) return;
+    if (!movie.value?.default_language) return;
 
     let tempColumns: QTableColumn[] = [
       {
@@ -92,11 +79,11 @@
     ];
 
     // Add other languages
-    Object.keys(currentMovie.languages).forEach((code) => {
-      if (code !== currentMovie.default_language) {
+    Object.keys(movie.value?.languages || {}).forEach((code) => {
+      if (code !== movie.value?.default_language) {
         tempColumns.push({
           name: code,
-          label: currentMovie.languages[code],
+          label: movie.value?.languages[code] || '',
           field: code,
           align: 'left' as const,
           sortable: false,
@@ -108,19 +95,20 @@
   };
 
   const setupRows = () => {
-    // if (!subtitles.value || !movie.value) return;
-    // rows.value = subtitles.value.map((subtitle) => {
-    //   const row: SubtitleRow = {
-    //     id: subtitle.id,
-    //     sl_no: subtitle.sl_no,
-    //     time: `${subtitle.start_time} - ${subtitle.end_time}`,
-    //   };
-    //   // Add content for each language
-    //   Object.keys(movie.value.languages).forEach((code) => {
-    //     row[code] = subtitle.content[code] || '';
-    //   });
-    //   return row;
-    // });
+    if (!subtitles.value || !movie.value) return;
+
+    rows.value = subtitles.value.map((subtitle) => {
+      const row: SubtitleRow = {
+        id: subtitle.id,
+        sl_no: subtitle.sl_no,
+        time: `${subtitle.start_time} - ${subtitle.end_time}`,
+      };
+      // Add content for each language
+      Object.keys(movie.value?.languages || {}).forEach((code) => {
+        row[code] = subtitle.content[code] || '';
+      });
+      return row;
+    });
   };
 
   const onCellEdit = async (
@@ -159,7 +147,7 @@
         size="sm"
         @click="
           () => {
-            showAdd = true;
+            showImport = true;
           }
         "
       >
@@ -184,34 +172,48 @@
         ? 'Loading...'
         : 'No subtitles found, Please import subtitle of default language'
     "
+    :resizable-columns="true"
   >
+    <template v-slot:body-cell-sl_no="props">
+      <q-td
+        :props="props"
+        :style="{ width: '60px' }"
+      >
+        {{ props.value }}
+      </q-td>
+    </template>
+    <template v-slot:body-cell-time="props">
+      <q-td
+        :props="props"
+        :style="{ width: '200px' }"
+      >
+        {{ props.value }}
+      </q-td>
+    </template>
     <template v-slot:body-cell="props">
       <q-td :props="props">
-        <template
-          v-if="props.col.name === 'sl_no' || props.col.name === 'time'"
-        >
-          {{ props.value }}
-        </template>
-        <template v-else>
-          <q-input
-            v-model="props.row[props.col.name]"
-            dense
-            borderless
-            @update:model-value="
-              (val) => onCellEdit(props.row, props.col.name, val)
-            "
-          />
-        </template>
+        <q-input
+          :readonly="props.col.name == movie?.default_language"
+          v-model="props.row[props.col.name]"
+          dense
+          autogrow
+          outlined
+          @update:model-value="
+            (val) => onCellEdit(props.row, props.col.name, val)
+          "
+        />
       </q-td>
     </template>
   </q-table>
 
-  <q-dialog v-model="showAdd">
-    <AddMovie
-      @onClose="showAdd = false"
-      @onAdded="
+  <q-dialog v-model="showImport">
+    <ImportSubtitle
+      :movie="movie as models.Movie"
+      @onClose="showImport = false"
+      @onImport="
         () => {
-          showAdd = false;
+          showImport = false;
+          getSubtitles();
         }
       "
     />

@@ -104,7 +104,6 @@
   };
 
   const onRequest = async (props: any) => {
-    console.log(props);
     const { page, rowsPerPage, sortBy, descending } = props.pagination;
     props.filter = filter.value;
     const response = await paginateMovies(props);

@@ -65,12 +65,10 @@
     const currentMovie = movie.value;
     if (!currentMovie?.default_language) return;
 
-    console.log(currentMovie);
-
     let tempColumns: QTableColumn[] = [
       {
         name: 'sl_no',
-        label: 'SL No',
+        label: 'Sl No',
         field: 'sl_no',
         align: 'left' as const,
         sortable: false,
@@ -84,7 +82,9 @@
       },
       {
         name: movie.value?.default_language || '',
-        label: movie.value?.languages[movie.value?.default_language] || '',
+        label:
+          movie.value?.languages[movie.value?.default_language] +
+            ' (Default)' || '',
         field: movie.value?.default_language || '',
         align: 'left' as const,
         sortable: false,
@@ -104,7 +104,6 @@
       }
     });
 
-    console.log(tempColumns);
     columns.value.push(...tempColumns);
   };
 

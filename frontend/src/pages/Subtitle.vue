@@ -13,6 +13,7 @@
   const loading = ref(true);
   const showImport = ref(false);
   const visibleLanguages = ref<Record<string, boolean>>({});
+  const selectedLanguages = ref<string[]>([]);
 
   const movie = ref<models.Movie>();
   const subtitles = ref<models.Subtitle[]>([]);
@@ -47,6 +48,7 @@
       Object.keys(movie.value.languages).forEach((code) => {
         if (code !== movie.value?.default_language) {
           visibleLanguages.value[code] = true;
+          selectedLanguages.value.push(code);
         }
       });
     }
@@ -126,11 +128,15 @@
     columns.value = tempColumns;
   };
 
-  const toggleLanguageVisibility = (code: string) => {
-    visibleLanguages.value = {
-      ...visibleLanguages.value,
-      [code]: !visibleLanguages.value[code]
-    };
+  const updateLanguageVisibility = (selected: string[]) => {
+    // Update all languages to false first
+    Object.keys(visibleLanguages.value).forEach(code => {
+      visibleLanguages.value[code] = false;
+    });
+    // Set selected languages to true
+    selected.forEach(code => {
+      visibleLanguages.value[code] = true;
+    });
     setupColumns();
   };
 
@@ -194,15 +200,32 @@
 
   <q-card flat class="full-width row justify-end items-center q-px-md q-pb-md">
     <div class="row q-gutter-md">
-      <template v-for="(lang, code) in movie?.languages" :key="code">
-        <q-checkbox
-          v-if="code !== movie?.default_language"
-          :model-value="visibleLanguages[code]"
-          :label="lang"
-          dense
-          @update:model-value="toggleLanguageVisibility(code)"
-        />
-      </template>
+      <q-select
+        v-if="movie?.languages"
+        v-model="selectedLanguages"
+        :options="Object.entries(movie.languages)
+          .filter(([code]) => code !== movie?.default_language)
+          .map(([code, name]) => ({ label: name, value: code }))"
+        label="Select Languages"
+        emit-value
+        map-options
+        multiple
+        outlined
+        dense
+        style="min-width: 200px"
+        @update:model-value="updateLanguageVisibility"
+      >
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item v-bind="itemProps">
+            <q-item-section>
+              <q-item-label>{{ opt.label }}</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-checkbox :model-value="selected" @update:model-value="toggleOption(opt)" />
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
     </div>
   </q-card>
 

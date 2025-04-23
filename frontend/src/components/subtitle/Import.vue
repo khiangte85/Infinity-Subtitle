@@ -84,7 +84,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Import Subtitle</span>
+      <span class="text-body2">Import default language subtitle</span>
       <q-space />
       <q-btn
         dense
@@ -119,6 +119,10 @@
           <q-icon name="fas fa-file" />
         </template>
       </q-file>
+      <div class="text-subtitle2 q-mt-sm">
+        <q-icon name="warning" color="negative" class="q-mr-sm" />
+        <span class="text-negative">Subtitle file must be in the default language ({{ movie.languages[movie.default_language] }})</span>
+      </div>
     </q-card-section>
 
     <q-card-section class="text-right q-mt-md">

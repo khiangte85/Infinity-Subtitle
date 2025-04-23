@@ -23,17 +23,40 @@ type Subtitle struct {
 	UpdatedAt time.Time         `json:"updated_at"`
 }
 
+type SubtitleResponse struct {
+	Subtitles  []Subtitle `json:"subtitles"`
+	Pagination Pagination `json:"pagination"`
+}
+
 func NewSubtitle() *Subtitle {
 	return &Subtitle{}
 }
 
-func (s Subtitle) GetSubtitlesByMovieID(movieID int) ([]Subtitle, error) {
+func (s Subtitle) GetSubtitlesByMovieID(movieID int, pagination Pagination) (SubtitleResponse, error) {
 	db := database.GetDB()
+	var response SubtitleResponse
 	var subtitles []Subtitle
 
-	rows, err := db.Query("SELECT * FROM subtitles WHERE movie_id = ?", movieID)
+	// Get total count
+	var total int
+	err := db.QueryRow("SELECT COUNT(*) FROM subtitles WHERE movie_id = ?", movieID).Scan(&total)
 	if err != nil {
-		return nil, err
+		return response, fmt.Errorf("failed to get total count: %w", err)
+	}
+
+	// Calculate offset
+	offset := (pagination.Page - 1) * pagination.RowsPerPage
+
+	// Get paginated subtitles
+	rows, err := db.Query(`
+		SELECT id, movie_id, sl_no, start_time, end_time, content, created_at, updated_at 
+		FROM subtitles 
+		WHERE movie_id = ? 
+		ORDER BY sl_no ASC
+		LIMIT ? OFFSET ?
+	`, movieID, pagination.RowsPerPage, offset)
+	if err != nil {
+		return response, err
 	}
 	defer rows.Close()
 
@@ -42,18 +65,32 @@ func (s Subtitle) GetSubtitlesByMovieID(movieID int) ([]Subtitle, error) {
 		var contentJson []byte
 		err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &subtitle.SlNo, &subtitle.StartTime, &subtitle.EndTime, &contentJson, &subtitle.CreatedAt, &subtitle.UpdatedAt)
 		if err != nil {
-			return nil, err
+			return response, err
 		}
-		
-		json.Unmarshal(contentJson, &subtitle.Content)
+
+		err = json.Unmarshal(contentJson, &subtitle.Content)
+		if err != nil {
+			return response, fmt.Errorf("failed to unmarshal content: %w", err)
+		}
 		subtitles = append(subtitles, subtitle)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return response, err
 	}
 
-	return subtitles, nil
+	response = SubtitleResponse{
+		Subtitles: subtitles,
+		Pagination: Pagination{
+			SortBy:      pagination.SortBy,
+			Descending:  pagination.Descending,
+			Page:        pagination.Page,
+			RowsPerPage: pagination.RowsPerPage,
+			RowsNumber:  total,
+		},
+	}
+
+	return response, nil
 }
 
 func (s Subtitle) UpdateSubtitle(subtitle Subtitle) error {
@@ -121,8 +158,7 @@ func (s Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
 
 		subtitle.Content[movie.DefaultLanguage] = line
 		subtitles = append(subtitles, *subtitle)
-		
-		
+
 		// Reset subtitle for next iteration
 		subtitle.SlNo = 0
 		subtitle.StartTime = ""

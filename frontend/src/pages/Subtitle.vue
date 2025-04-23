@@ -16,6 +16,13 @@
   const movie = ref<models.Movie>();
   const subtitles = ref<models.Subtitle[]>([]);
   const columns = ref<QTableColumn[]>([]);
+  const pagination = ref<models.Pagination>({
+    sortBy: 'sl_no',
+    descending: false,
+    page: 1,
+    rowsPerPage: 20,
+    rowsNumber: 0,
+  });
 
   interface SubtitleRow {
     id: number;
@@ -28,7 +35,7 @@
 
   onMounted(async () => {
     getMovie();
-    getSubtitles();
+    onRequest({ pagination: pagination.value });
   });
 
   const getMovie = async () => {
@@ -37,15 +44,31 @@
     setupColumns();
   };
 
-  const getSubtitles = async () => {
+  const getSubtitles = async (props: any) => {
     try {
-      const response = await GetSubtitlesByMovieID(Number(movieId));
-      subtitles.value = response;
+      const response = await GetSubtitlesByMovieID(
+        Number(movieId),
+        props.pagination
+      );
+      subtitles.value = response.subtitles;
       setupRows();
+      return response;
     } catch (error) {
       console.error(error);
     } finally {
       loading.value = false;
+    }
+  };
+
+  const onRequest = async (props: any) => {
+    const { page, rowsPerPage, sortBy, descending } = props.pagination;
+    const response = await getSubtitles(props);
+    if (response) {
+      pagination.value.page = page;
+      pagination.value.rowsPerPage = rowsPerPage;
+      pagination.value.rowsNumber = response.pagination.rowsNumber;
+      pagination.value.sortBy = sortBy;
+      pagination.value.descending = descending;
     }
   };
 
@@ -157,7 +180,7 @@
   </q-card>
 
   <q-table
-    class="text-left"
+    class="text-left "
     flat
     color="primary"
     bordered
@@ -166,7 +189,12 @@
     row-key="id"
     separator="cell"
     wrap-cells
-    :pagination="{ rowsPerPage: 50 }"
+    :loading="loading"
+    v-model:pagination="pagination"
+    :rows-per-page-options="[10, 20, 50, 100]"
+    binary-state-sort
+    rows-per-page-label="Records per page"
+    @request="onRequest"
     :no-data-label="
       loading
         ? 'Loading...'
@@ -213,7 +241,7 @@
       @onImport="
         () => {
           showImport = false;
-          getSubtitles();
+          onRequest({ pagination });
         }
       "
     />

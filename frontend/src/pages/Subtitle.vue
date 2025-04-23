@@ -5,6 +5,7 @@
   import { GetMovieByID } from '../../wailsjs/go/backend/Movie.js';
   import { GetSubtitlesByMovieID } from '../../wailsjs/go/backend/Subtitle.js';
   import ImportSubtitle from '../components/subtitle/Import.vue';
+  import TranslateSubtitle from '../components/subtitle/Translate.vue';
   import { useRouter } from 'vue-router';
 
   const router = useRouter();
@@ -12,6 +13,7 @@
 
   const loading = ref(true);
   const showImport = ref(false);
+  const showTranslate = ref(false);
   const visibleLanguages = ref<Record<string, boolean>>({});
   const selectedLanguages = ref<string[]>([]);
 
@@ -198,7 +200,15 @@
     </q-card-section>
   </q-card>
 
-  <q-card flat class="full-width row justify-end items-center q-px-md q-pb-md">
+  <q-card flat class="full-width row justify-between items-center q-px-md q-pb-md">
+    <div class="row q-gutter-md">
+      <q-btn
+        color="primary"
+        icon="fas fa-language"
+        label="Translate"
+        @click="showTranslate = true"
+      />
+    </div>
     <div class="row q-gutter-md">
       <q-select
         v-if="movie?.languages"
@@ -294,6 +304,13 @@
           onRequest({ pagination });
         }
       "
+    />
+  </q-dialog>
+
+  <q-dialog v-model="showTranslate" full-width full-height persistent>
+    <TranslateSubtitle
+      :movie="movie as models.Movie"
+      @onClose="showTranslate = false"
     />
   </q-dialog>
 </template>

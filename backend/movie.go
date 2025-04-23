@@ -78,21 +78,26 @@ func (m Movie) GetMovieByID(id int) (*Movie, error) {
 		return nil, errors.New("database connection is nil")
 	}
 
+	// Create a new Movie instance for each request
+	movie := &Movie{
+		Languages: make(map[string]string),
+	}
+
 	// Only select needed fields
 	row := db.QueryRow("SELECT * FROM movies WHERE id = ?", id)
 	var languages []byte
 
-	err := row.Scan(&m.ID, &m.Title, &m.DefaultLanguage, &languages, &m.CreatedAt, &m.UpdatedAt)
+	err := row.Scan(&movie.ID, &movie.Title, &movie.DefaultLanguage, &languages, &movie.CreatedAt, &movie.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan movie: %w", err)
 	}
 
-	err = json.Unmarshal(languages, &m.Languages)
+	err = json.Unmarshal(languages, &movie.Languages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal languages: %w", err)
 	}
 
-	return &m, nil
+	return movie, nil
 }
 
 func (m Movie) UpdateMovie(movie Movie) error {

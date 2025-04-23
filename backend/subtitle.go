@@ -154,8 +154,6 @@ func (s Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
 			continue
 		}
 
-		fmt.Printf("line: %s\n", line)
-
 		subtitle.Content[movie.DefaultLanguage] = line
 		subtitles = append(subtitles, *subtitle)
 

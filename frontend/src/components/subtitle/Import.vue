@@ -26,8 +26,8 @@
         errors.value = {};
       } else {
         selectedFile.value = null;
-        errors.value = { 
-          error: 'Invalid file type. Please select a .srt file' 
+        errors.value = {
+          error: 'Invalid file type. Please select a .srt file',
         };
       }
     } else {
@@ -38,15 +38,15 @@
 
   async function onSubmit() {
     if (!selectedFile.value) {
-      errors.value = { 
-        error: 'Please select a .srt file' 
+      errors.value = {
+        error: 'Please select a .srt file',
       };
       return;
     }
 
     if (!selectedFile.value.name.endsWith('.srt')) {
-      errors.value = { 
-        error: 'Invalid file type. Please select a .srt file' 
+      errors.value = {
+        error: 'Invalid file type. Please select a .srt file',
       };
       return;
     }
@@ -56,7 +56,7 @@
     try {
       // Read file content
       const content = await selectedFile.value.text();
-      
+
       // Call backend function
       const response = await UploadSRTFile(props.movie, content);
       console.log(response);
@@ -64,8 +64,8 @@
       emit('onImport');
       emit('onClose');
     } catch (err: any) {
-      errors.value = { 
-        error: err.message || 'Failed to upload subtitle file' 
+      errors.value = {
+        error: err.message || 'Failed to upload subtitle file',
       };
     } finally {
       saving.value = false;
@@ -105,6 +105,19 @@
 
     <q-card-section class="q-pb-none">
       <div class="text-subtitle2 q-mb-sm">Subtitle File (.srt)</div>
+      <div class="text-subtitle2 q-mt-sm">
+        <q-icon
+          name="warning"
+          color="negative"
+          class="q-mr-sm"
+        />
+        <span class="text-negative"
+          >This will overwrite all existing subtitles of this Movie<br />Subtitle
+          file must be in the default language ({{
+            movie.languages[movie.default_language]
+          }})</span
+        >
+      </div>
       <q-file
         v-model="selectedFile"
         label="Select .srt file"
@@ -119,10 +132,6 @@
           <q-icon name="fas fa-file" />
         </template>
       </q-file>
-      <div class="text-subtitle2 q-mt-sm">
-        <q-icon name="warning" color="negative" class="q-mr-sm" />
-        <span class="text-negative">Subtitle file must be in the default language ({{ movie.languages[movie.default_language] }})</span>
-      </div>
     </q-card-section>
 
     <q-card-section class="text-right q-mt-md">

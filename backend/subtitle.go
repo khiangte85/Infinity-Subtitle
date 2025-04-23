@@ -131,7 +131,7 @@ func (s Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
 		UpdatedAt: time.Now(),
 	}
 
-	for key, _ := range movie.Languages {
+	for key := range movie.Languages {
 		subtitle.Content[key] = ""
 	}
 
@@ -164,7 +164,7 @@ func (s Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
 		subtitle.StartTime = ""
 		subtitle.EndTime = ""
 		subtitle.Content = make(map[string]string)
-		for key, _ := range movie.Languages {
+		for key := range movie.Languages {
 			subtitle.Content[key] = ""
 		}
 	}

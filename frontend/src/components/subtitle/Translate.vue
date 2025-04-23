@@ -304,7 +304,7 @@
         v-model:pagination="pagination"
         :rows-per-page-options="[20]"
         rows-per-page-label="Records per page"
-        style="height: 650px"
+        :style="{ height: 'calc(100vh - 300px)' }"
         @request="onRequest"
       >
         <template v-slot:body-cell-sl_no="props">

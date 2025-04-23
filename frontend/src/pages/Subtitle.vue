@@ -74,6 +74,7 @@
   };
 
   const onRequest = async (props: any) => {
+    loading.value = true;
     const { page, rowsPerPage, sortBy, descending } = props.pagination;
     const response = await getSubtitles(props);
     if (response) {
@@ -116,7 +117,10 @@
 
     // Add other languages based on visibility
     Object.keys(movie.value?.languages || {}).forEach((code) => {
-      if (code !== movie.value?.default_language && visibleLanguages.value[code]) {
+      if (
+        code !== movie.value?.default_language &&
+        visibleLanguages.value[code]
+      ) {
         tempColumns.push({
           name: code,
           label: movie.value?.languages[code] || '',
@@ -132,11 +136,11 @@
 
   const updateLanguageVisibility = (selected: string[]) => {
     // Update all languages to false first
-    Object.keys(visibleLanguages.value).forEach(code => {
+    Object.keys(visibleLanguages.value).forEach((code) => {
       visibleLanguages.value[code] = false;
     });
     // Set selected languages to true
-    selected.forEach(code => {
+    selected.forEach((code) => {
       visibleLanguages.value[code] = true;
     });
     setupColumns();
@@ -200,7 +204,10 @@
     </q-card-section>
   </q-card>
 
-  <q-card flat class="full-width row justify-between items-center q-py-md q-pb-md">
+  <q-card
+    flat
+    class="full-width row justify-between items-center q-py-md q-pb-md"
+  >
     <div class="row q-gutter-md">
       <q-btn
         color="primary"
@@ -213,9 +220,11 @@
       <q-select
         v-if="movie?.languages"
         v-model="selectedLanguages"
-        :options="Object.entries(movie.languages)
-          .filter(([code]) => code !== movie?.default_language)
-          .map(([code, name]) => ({ label: name, value: code }))"
+        :options="
+          Object.entries(movie.languages)
+            .filter(([code]) => code !== movie?.default_language)
+            .map(([code, name]) => ({ label: name, value: code }))
+        "
         label="Select Languages"
         emit-value
         map-options
@@ -231,7 +240,10 @@
               <q-item-label>{{ opt.label }}</q-item-label>
             </q-item-section>
             <q-item-section side>
-              <q-checkbox :model-value="selected" @update:model-value="toggleOption(opt)" />
+              <q-checkbox
+                :model-value="selected"
+                @update:model-value="toggleOption(opt)"
+              />
             </q-item-section>
           </q-item>
         </template>
@@ -240,7 +252,7 @@
   </q-card>
 
   <q-table
-    class="text-left "
+    class="text-left table-sticky-header"
     flat
     color="primary"
     bordered
@@ -251,7 +263,7 @@
     wrap-cells
     :loading="loading"
     v-model:pagination="pagination"
-    :rows-per-page-options="[10, 20, 50, 100]"
+    :rows-per-page-options="[10, 20, 50]"
     binary-state-sort
     rows-per-page-label="Records per page"
     @request="onRequest"
@@ -261,6 +273,7 @@
         : 'No subtitles found, Please import subtitle of default language'
     "
     :resizable-columns="true"
+    :style="{ height: 'calc(100vh - 300px)' }"
   >
     <template v-slot:body-cell-sl_no="props">
       <q-td
@@ -307,7 +320,12 @@
     />
   </q-dialog>
 
-  <q-dialog v-model="showTranslate" full-width full-height persistent>
+  <q-dialog
+    v-model="showTranslate"
+    full-width
+    full-height
+    persistent
+  >
     <TranslateSubtitle
       :movie="movie as models.Movie"
       @onClose="showTranslate = false"

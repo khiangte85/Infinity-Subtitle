@@ -12,6 +12,7 @@
 
   const loading = ref(true);
   const showImport = ref(false);
+  const visibleLanguages = ref<Record<string, boolean>>({});
 
   const movie = ref<models.Movie>();
   const subtitles = ref<models.Subtitle[]>([]);
@@ -41,6 +42,14 @@
   const getMovie = async () => {
     const response = await GetMovieByID(Number(movieId));
     movie.value = response;
+    // Initialize visibility for all non-default languages
+    if (movie.value?.languages) {
+      Object.keys(movie.value.languages).forEach((code) => {
+        if (code !== movie.value?.default_language) {
+          visibleLanguages.value[code] = true;
+        }
+      });
+    }
     setupColumns();
   };
 
@@ -101,9 +110,9 @@
       },
     ];
 
-    // Add other languages
+    // Add other languages based on visibility
     Object.keys(movie.value?.languages || {}).forEach((code) => {
-      if (code !== movie.value?.default_language) {
+      if (code !== movie.value?.default_language && visibleLanguages.value[code]) {
         tempColumns.push({
           name: code,
           label: movie.value?.languages[code] || '',
@@ -114,7 +123,15 @@
       }
     });
 
-    columns.value.push(...tempColumns);
+    columns.value = tempColumns;
+  };
+
+  const toggleLanguageVisibility = (code: string) => {
+    visibleLanguages.value = {
+      ...visibleLanguages.value,
+      [code]: !visibleLanguages.value[code]
+    };
+    setupColumns();
   };
 
   const setupRows = () => {
@@ -168,15 +185,25 @@
         color="primary"
         icon="fas fa-plus"
         size="sm"
-        @click="
-          () => {
-            showImport = true;
-          }
-        "
+        @click="showImport = true"
       >
         <q-tooltip> Import default language subtitle </q-tooltip>
       </q-btn>
     </q-card-section>
+  </q-card>
+
+  <q-card flat class="full-width row justify-end items-center q-px-md q-pb-md">
+    <div class="row q-gutter-md">
+      <template v-for="(lang, code) in movie?.languages" :key="code">
+        <q-checkbox
+          v-if="code !== movie?.default_language"
+          :model-value="visibleLanguages[code]"
+          :label="lang"
+          dense
+          @update:model-value="toggleLanguageVisibility(code)"
+        />
+      </template>
+    </div>
   </q-card>
 
   <q-table

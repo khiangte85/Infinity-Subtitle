@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -213,6 +214,82 @@ func (s Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
 	// Commit the transaction
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetLanguage string) error {
+	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection is nil")
+	}
+
+	translationService := NewTranslationService()
+	ctx := context.Background()
+
+	isNextPage := true
+	pagination := Pagination{
+		Page:        1,
+		RowsPerPage: 100,
+	}
+
+	for isNextPage {
+		data, err := s.GetSubtitlesByMovieID(movieId, pagination)
+		if err != nil {
+			return fmt.Errorf("failed to get subtitles: %w", err)
+		}
+
+		if len(data.Subtitles) == 0 {
+			isNextPage = false
+			continue
+		}
+
+		// Collect unique texts for translation
+		textsToTranslate := make([]string, 0)
+		textToSubtitleID := make(map[string][]int)
+
+		for _, subtitle := range data.Subtitles {
+			text := subtitle.Content[sourceLanguage]
+			if text == "" {
+				continue
+			}
+			if _, exists := textToSubtitleID[text]; !exists {
+				textsToTranslate = append(textsToTranslate, text)
+			}
+			textToSubtitleID[text] = append(textToSubtitleID[text], subtitle.ID)
+		}
+
+		// Process translations in parallel
+		translations := translationService.processBatch(ctx, textsToTranslate, sourceLanguage, targetLanguage)
+
+		// Update subtitles with translations
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+
+		for original, translated := range translations {
+			subtitleIDs := textToSubtitleID[original]
+			for _, id := range subtitleIDs {
+				_, err = tx.Exec(`
+					UPDATE subtitles 
+					SET content = json_set(content, '$.' || ?, ?),
+						updated_at = CURRENT_TIMESTAMP
+					WHERE id = ?
+				`, targetLanguage, translated, id)
+				if err != nil {
+					tx.Rollback()
+					return fmt.Errorf("failed to update subtitle: %w", err)
+				}
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
+		}
+
+		pagination.Page++
 	}
 
 	return nil

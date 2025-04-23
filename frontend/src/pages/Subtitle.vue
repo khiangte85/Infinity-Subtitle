@@ -200,7 +200,7 @@
     </q-card-section>
   </q-card>
 
-  <q-card flat class="full-width row justify-between items-center q-px-md q-pb-md">
+  <q-card flat class="full-width row justify-between items-center q-py-md q-pb-md">
     <div class="row q-gutter-md">
       <q-btn
         color="primary"

@@ -167,7 +167,7 @@
     errors.value = {};
     if (!sourceLanguage.value) return false;
 
-    // Check if source language has content in first 50 subtitles
+    // Check if source language has content in first x subtitles
     const hasContent = subtitles.value.some(
       (subtitle) =>
         subtitle.content[sourceLanguage.value] &&

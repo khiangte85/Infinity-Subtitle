@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { ref, computed, onMounted, watch } from 'vue';
   import { backend as models } from '../../../wailsjs/go/models.js';
-  import { GetSubtitlesByMovieID } from '../../../wailsjs/go/backend/Subtitle.js';
+  import { GetSubtitlesByMovieID, TranslateSubtitles } from '../../../wailsjs/go/backend/Subtitle.js';
   import Error from '../Error.vue';
   import { QTableColumn } from 'quasar';
 
@@ -214,17 +214,33 @@
     row[col] = String(value || '');
   };
 
-  const onSubmit = () => {
-    if (!validate()) return;
+  const onSubmit = async () => {
+    try {
+      loading.value = true;
+      if (!validate()) return;
 
     // TODO: Implement translation logic
+    const response = await TranslateSubtitles(
+      Number(props.movie.id),
+      sourceLanguage.value,
+      targetLanguage.value
+    );
+
+
     console.log(
       'Translating from',
       sourceLanguage.value,
       'to',
       targetLanguage.value
-    );
-    emit('onClose');
+      );
+      console.log(response);
+      // emit('onClose');
+    } catch (error) {
+      console.error(error);
+      errors.value = { error: 'Failed to translate subtitles' };
+    } finally {
+      loading.value = false;
+    }
   };
 </script>
 

@@ -225,6 +225,12 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		return errors.New("database connection is nil")
 	}
 
+	movie := NewMovie()
+	movie, err := movie.GetMovieByID(movieId)
+	if err != nil {
+		return fmt.Errorf("failed to get movie: %w", err)
+	}
+
 	translationService := NewTranslationService()
 	ctx := context.Background()
 
@@ -246,22 +252,23 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		}
 
 		// Collect unique texts for translation
-		textsToTranslate := make([]string, 0)
-		textToSubtitleID := make(map[string][]int)
+		textsToTranslate := make(map[string]string)
 
 		for _, subtitle := range data.Subtitles {
 			text := subtitle.Content[sourceLanguage]
 			if text == "" {
 				continue
 			}
-			if _, exists := textToSubtitleID[text]; !exists {
-				textsToTranslate = append(textsToTranslate, text)
+
+			if _, ok := textsToTranslate[text]; !ok {
+				textsToTranslate[text] = ""
 			}
-			textToSubtitleID[text] = append(textToSubtitleID[text], subtitle.ID)
 		}
 
 		// Process translations in parallel
-		translations := translationService.processBatch(ctx, textsToTranslate, sourceLanguage, targetLanguage)
+		sourceLangFullText := movie.Languages[sourceLanguage]
+		targetLangFullText := movie.Languages[targetLanguage]
+		translations := translationService.processBatch(ctx, textsToTranslate, sourceLangFullText, targetLangFullText)
 
 		// Update subtitles with translations
 		tx, err := db.Begin()
@@ -269,19 +276,24 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 			return fmt.Errorf("failed to begin transaction: %w", err)
 		}
 
-		for original, translated := range translations {
-			subtitleIDs := textToSubtitleID[original]
-			for _, id := range subtitleIDs {
-				_, err = tx.Exec(`
-					UPDATE subtitles 
-					SET content = json_set(content, '$.' || ?, ?),
-						updated_at = CURRENT_TIMESTAMP
-					WHERE id = ?
-				`, targetLanguage, translated, id)
-				if err != nil {
-					tx.Rollback()
-					return fmt.Errorf("failed to update subtitle: %w", err)
-				}
+		for _, subtitle := range data.Subtitles {
+			text := subtitle.Content[sourceLanguage]
+			if text == "" {
+				continue
+			}
+			translated := translations[text]
+			if translated == "" {
+				continue
+			}
+			_, err = tx.Exec(`
+				UPDATE subtitles 
+				SET content = json_set(content, '$.' || ?, ?),
+					updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?
+			`, targetLanguage, translated, subtitle.ID)
+			if err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to update subtitle: %w", err)
 			}
 		}
 

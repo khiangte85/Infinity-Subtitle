@@ -1,10 +1,14 @@
 module infinity-subtitle
 
-go 1.23
+go 1.23.0
 
 require (
+	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.25
+	github.com/sashabaranov/go-openai v1.38.2
 	github.com/wailsapp/wails/v2 v2.10.1
+	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
+	golang.org/x/time v0.11.0
 )
 
 require (
@@ -25,7 +29,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/samber/lo v1.49.1 // indirect
-	github.com/sashabaranov/go-openai v1.38.2 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect

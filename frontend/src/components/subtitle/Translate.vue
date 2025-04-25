@@ -350,6 +350,7 @@
               @update:model-value="
                 (val) => onCellEdit(props.row, props.col.name, val)
               "
+              :disable="loading"
             />
           </q-td>
         </template>
@@ -362,7 +363,8 @@
         color="negative"
         class="q-px-md"
         @click="emit('onClose')"
-        >Cancel</q-btn
+        :disable="loading"
+        >Close</q-btn
       >
       <q-btn
         color="primary"

@@ -31,6 +31,10 @@ type SubtitleResponse struct {
 	Pagination Pagination `json:"pagination"`
 }
 
+type ExportResponse struct {
+	FilePath string `json:"file_path"`
+}
+
 func NewSubtitle() *Subtitle {
 	return &Subtitle{}
 }
@@ -314,10 +318,17 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 	return nil
 }
 
-func (s Subtitle) ExportSubtitle(movieId int, language string) error {
+func (s Subtitle) ExportSubtitle(movieId int, language string) (ExportResponse, error) {
 	db := database.GetDB()
 	if db == nil {
-		return errors.New("database connection is nil")
+		return ExportResponse{}, errors.New("database connection is nil")
+	}
+
+	// Get movie details
+	movie := NewMovie()
+	movie, err := movie.GetMovieByID(movieId)
+	if err != nil {
+		return ExportResponse{}, fmt.Errorf("failed to get movie: %w", err)
 	}
 
 	// Get all subtitles for the movie
@@ -328,7 +339,7 @@ func (s Subtitle) ExportSubtitle(movieId int, language string) error {
 		ORDER BY sl_no ASC
 	`, movieId)
 	if err != nil {
-		return fmt.Errorf("failed to get subtitles: %w", err)
+		return ExportResponse{}, fmt.Errorf("failed to get subtitles: %w", err)
 	}
 	defer rows.Close()
 
@@ -338,59 +349,65 @@ func (s Subtitle) ExportSubtitle(movieId int, language string) error {
 		var contentJson []byte
 		err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &subtitle.SlNo, &subtitle.StartTime, &subtitle.EndTime, &contentJson, &subtitle.CreatedAt, &subtitle.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to scan subtitle: %w", err)
+			return ExportResponse{}, fmt.Errorf("failed to scan subtitle: %w", err)
 		}
 
 		err = json.Unmarshal(contentJson, &subtitle.Content)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal content: %w", err)
+			return ExportResponse{}, fmt.Errorf("failed to unmarshal content: %w", err)
 		}
 		subtitles = append(subtitles, subtitle)
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating subtitles: %w", err)
+		return ExportResponse{}, fmt.Errorf("error iterating subtitles: %w", err)
 	}
 
-	// Create export directory if it doesn't exist
-	exportDir := "exports"
-	if err := os.MkdirAll(exportDir, 0755); err != nil {
-		return fmt.Errorf("failed to create export directory: %w", err)
+	// Create subtitles directory if it doesn't exist
+	subtitlesDir := "subtitles"
+	if err := os.MkdirAll(subtitlesDir, 0755); err != nil {
+		return ExportResponse{}, fmt.Errorf("failed to create subtitles directory: %w", err)
 	}
 
-	// Get movie details
-	movie := NewMovie()
-	movie, err = movie.GetMovieByID(movieId)
+	// Create movie directory
+	movieDir := filepath.Join(subtitlesDir, movie.Title)
+	if err := os.MkdirAll(movieDir, 0755); err != nil {
+		return ExportResponse{}, fmt.Errorf("failed to create movie directory: %w", err)
+	}
+
+	// Create SRT file
+	fileName := fmt.Sprintf("%s - %s.srt", movie.Title, movie.Languages[language])
+	filePath := filepath.Join(movieDir, fileName)
+	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to get movie: %w", err)
+		return ExportResponse{}, fmt.Errorf("failed to create export file: %w", err)
+	}
+	defer file.Close()
+
+	// Write subtitles in SRT format
+	for _, subtitle := range subtitles {
+		content := subtitle.Content[language]
+		if content == "" {
+			continue
+		}
+
+		// Write subtitle number
+		fmt.Fprintf(file, "%d\n", subtitle.SlNo)
+
+		// Write time
+		fmt.Fprintf(file, "%s --> %s\n", subtitle.StartTime, subtitle.EndTime)
+
+		// Write content
+		fmt.Fprintf(file, "%s\n\n", content)
 	}
 
-	// Create SRT file for each language
-	for langCode := range movie.Languages {
-		fileName := filepath.Join(exportDir, fmt.Sprintf("%s_%s.srt", movie.Title, langCode))
-		file, err := os.Create(fileName)
-		if err != nil {
-			return fmt.Errorf("failed to create export file: %w", err)
-		}
-		defer file.Close()
-
-		// Write subtitles in SRT format
-		for _, subtitle := range subtitles {
-			content := subtitle.Content[langCode]
-			if content == "" {
-				continue
-			}
-
-			// Write subtitle number
-			fmt.Fprintf(file, "%d\n", subtitle.SlNo)
-
-			// Write time
-			fmt.Fprintf(file, "%s --> %s\n", subtitle.StartTime, subtitle.EndTime)
-
-			// Write content
-			fmt.Fprintf(file, "%s\n\n", content)
-		}
+	// Get absolute path
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return ExportResponse{}, fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
-	return nil
+	return ExportResponse{
+		FilePath: absPath,
+	}, nil
 }

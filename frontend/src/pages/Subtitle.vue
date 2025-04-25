@@ -6,10 +6,11 @@
   import {
     GetSubtitlesByMovieID,
     UpdateSubtitle,
-    ExportSubtitle,
+    ExportSubtitle as ExportSubtitleAPI,
   } from '../../wailsjs/go/backend/Subtitle.js';
   import ImportSubtitle from '../components/subtitle/Import.vue';
   import TranslateSubtitle from '../components/subtitle/Translate.vue';
+  import ExportSubtitle from '../components/subtitle/Export.vue';
   import { useRouter } from 'vue-router';
   import { useQuasar } from 'quasar';
 
@@ -20,6 +21,7 @@
   const loading = ref(true);
   const showImport = ref(false);
   const showTranslate = ref(false);
+  const showExport = ref(false);
   const visibleLanguages = ref<Record<string, boolean>>({});
   const selectedLanguages = ref<string[]>([]);
 
@@ -33,6 +35,9 @@
     rowsPerPage: 20,
     rowsNumber: 0,
   });
+
+  const exportLanguage = ref<string>('');
+  const exportFilePath = ref<string>('');
 
   interface SubtitleRow {
     id: number;
@@ -208,31 +213,6 @@
       console.error(error);
     }
   };
-
-  const onExport = async () => {
-    try {
-      loading.value = true;
-      await ExportSubtitle(
-        Number(movieId),
-        movie.value?.default_language || ''
-      );
-      $q.notify({
-        message: 'Subtitles exported successfully to exports directory',
-        color: 'primary',
-        icon: 'fas fa-check',
-        timeout: 3000,
-      });
-    } catch (error) {
-      console.error(error);
-      $q.notify({
-        message: 'Failed to export subtitles',
-        color: 'negative',
-        icon: 'fas fa-times',
-      });
-    } finally {
-      loading.value = false;
-    }
-  };
 </script>
 
 <template>
@@ -271,10 +251,9 @@
           color="primary"
           icon="fas fa-download"
           size="sm"
-          @click="onExport"
-          :loading="loading"
+          @click="showExport = true"
         >
-          <q-tooltip> Export subtitles to SRT files </q-tooltip>
+          <q-tooltip> Export subtitles </q-tooltip>
         </q-btn>
       </div>
     </q-card-section>
@@ -408,6 +387,17 @@
           onRequest({ pagination });
         }
       "
+    />
+  </q-dialog>
+
+  <q-dialog
+    v-model="showExport"
+    persistent
+  >
+    <ExportSubtitle
+      :movie="movie as models.Movie"
+      @onClose="showExport = false"
+      @onExport="() => onRequest({ pagination })"
     />
   </q-dialog>
 </template>

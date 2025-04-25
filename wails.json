@@ -9,5 +9,20 @@
   "author": {
     "name": "awmtea",
     "email": "awmtea105.infinity@gmail.com"
+  },
+  "info": {
+    "companyName": "awmtea",
+    "productName": "Infinity Subtitle",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2024 awmtea",
+    "comments": "A subtitle translation tool"
+  },
+  "nsisType": "multiple",
+  "appargs": "",
+  "windows": {
+    "icon": "build/windows/icon.ico"
+  },
+  "mac": {
+    "icon": "build/darwin/icon.icns"
   }
 }

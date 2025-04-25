@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"infinity-subtitle/backend/logger"
+
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/sashabaranov/go-openai"
 	"golang.org/x/exp/maps"
@@ -17,14 +19,28 @@ import (
 type TranslationService struct {
 	client      *openai.Client
 	rateLimiter *rate.Limiter
+	logger      *logger.Logger
 }
 
-func NewTranslationService() *TranslationService {
-	fmt.Println("OPENAI_API_KEY", os.Getenv("OPENAI_API_KEY"))
-	return &TranslationService{
-		client:      openai.NewClient(os.Getenv("OPENAI_API_KEY")),
-		rateLimiter: rate.NewLimiter(rate.Every(time.Second/60), 1),
+func NewTranslationService() (*TranslationService, error) {
+	log, err := logger.GetLogger()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get logger: %w", err)
 	}
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	log.Info("Initializing translation service with API key: %s", apiKey)
+
+	return &TranslationService{
+		client:      openai.NewClient(apiKey),
+		rateLimiter: rate.NewLimiter(rate.Every(time.Second/60), 1),
+		logger:      log,
+	}, nil
+}
+
+// Close should be called when the service is no longer needed
+func (ts *TranslationService) Close() error {
+	return nil
 }
 
 type TranslationRequest struct {
@@ -42,19 +58,17 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 		return make(map[string]string), nil
 	}
 
-	// Wait for rate limiter
 	if err := ts.rateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	// Create a prompt for batch translation
 	prompt := fmt.Sprintf("Translate the following texts from %s to %s. Only output the translations in JSON format with the same keys as input.\n\nTexts to translate:\n", sourceLang, targetLang)
 	for text := range texts {
 		prompt += fmt.Sprintf("- %s\n", text)
 	}
 	prompt += "\nOutput format should be a JSON object with the same keys as input, containing only the translations."
 
-	fmt.Println("[INFO] prompt: ", prompt)
+	ts.logger.Info("Translation prompt: %s", prompt)
 
 	resp, err := ts.client.CreateChatCompletion(
 		ctx,
@@ -69,20 +83,19 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 		},
 	)
 	if err != nil {
-		fmt.Println("[ERROR] chat completion error: ", err)
+		ts.logger.Error("Chat completion error: %v", err)
 		return nil, fmt.Errorf("failed to create chat completion: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		fmt.Println("[ERROR] no response from OpenAI: ", resp.Choices)
+		ts.logger.Error("No response from OpenAI: %v", resp.Choices)
 		return nil, fmt.Errorf("no response from OpenAI")
 	}
 
-	// Parse the response as JSON
 	var translations map[string]string
 	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &translations)
 	if err != nil {
-		fmt.Println("[ERROR] failed to parse translation response: ", resp.Choices[0].Message.Content)
+		ts.logger.Error("Failed to parse translation response: %s", resp.Choices[0].Message.Content)
 		return nil, fmt.Errorf("failed to parse translation response: %w", err)
 	}
 
@@ -148,7 +161,7 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 		mu.Unlock()
 	}
 
-	fmt.Println("[INFO] translations: ", results)
+	ts.logger.Info("Completed translations: %v", results)
 
 	return results
 }

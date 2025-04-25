@@ -231,7 +231,12 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		return fmt.Errorf("failed to get movie: %w", err)
 	}
 
-	translationService := NewTranslationService()
+	translationService, err := NewTranslationService()
+	if err != nil {
+		return fmt.Errorf("failed to create translation service: %w", err)
+	}
+	defer translationService.Close()
+
 	ctx := context.Background()
 
 	isNextPage := true

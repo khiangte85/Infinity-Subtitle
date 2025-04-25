@@ -4,4 +4,4 @@ frontend/dist
 infinity-subtitle.db
 models/*
 logs/*
-subtitles/
+subtitles

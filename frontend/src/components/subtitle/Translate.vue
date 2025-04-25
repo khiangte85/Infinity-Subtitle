@@ -1,10 +1,16 @@
 <script setup lang="ts">
-  import { ref, computed, onMounted, watch } from 'vue';
+  import { ref, computed, onMounted } from 'vue';
+  import { useQuasar } from 'quasar';
   import { backend as models } from '../../../wailsjs/go/models.js';
-  import { GetSubtitlesByMovieID, TranslateSubtitles } from '../../../wailsjs/go/backend/Subtitle.js';
+  import {
+    GetSubtitlesByMovieID,
+    TranslateSubtitles,
+    UpdateSubtitle,
+  } from '../../../wailsjs/go/backend/Subtitle.js';
   import Error from '../Error.vue';
   import { QTableColumn } from 'quasar';
 
+  const $q = useQuasar();
   const props = defineProps<{
     movie: models.Movie;
   }>();
@@ -23,13 +29,6 @@
     page: 1,
     rowsPerPage: 20,
     rowsNumber: 0,
-  });
-
-  const computedPagination = computed({
-    get: () => pagination.value,
-    set: (val) => {
-      pagination.value = val;
-    },
   });
 
   const languageOptions = computed(() => {
@@ -114,7 +113,11 @@
       return response;
     } catch (error) {
       console.error(error);
-      errors.value = { error: 'Failed to load subtitles' };
+      $q.notify({
+        message: 'Failed to load subtitles',
+        color: 'negative',
+        icon: 'fas fa-times',
+      });
     } finally {
       loading.value = false;
     }
@@ -129,12 +132,12 @@
         rowsPerPage,
         sortBy,
         descending,
-        rowsNumber: pagination.value.rowsNumber
+        rowsNumber: pagination.value.rowsNumber,
       });
       if (response) {
         pagination.value = {
           ...props.pagination,
-          rowsNumber: response.pagination.rowsNumber
+          rowsNumber: response.pagination.rowsNumber,
         };
       }
     } catch (error) {
@@ -157,7 +160,11 @@
       setupRows();
     } catch (error) {
       console.error(error);
-      errors.value = { error: 'Failed to load subtitles' };
+      $q.notify({
+        message: 'Failed to load subtitles',
+        color: 'negative',
+        icon: 'fas fa-times',
+      });
     } finally {
       loading.value = false;
     }
@@ -207,11 +214,47 @@
     return validateSourceLanguage() && validateTargetLanguage();
   };
 
-  const onCellEdit = (row: any, col: string, value: string | number | null) => {
+  const onSubtitleUpdate = async (
+    row: any,
+    col: string,
+    value: string | number | null,
+    event: KeyboardEvent
+  ) => {
     if (!targetLanguage.value || col !== targetLanguage.value) return;
+    if (event.key !== 'Enter') return;
 
-    // Update the content
-    row[col] = String(value || '');
+    try {
+      // Update the content
+      row[col] = String(value || '');
+
+      // Find the subtitle and update it
+      const subtitle = subtitles.value.find((s) => s.id === row.id);
+      if (!subtitle) return;
+
+      if (value === null || value === undefined || value === '') {
+        $q.notify({
+          message: 'Subtitle cannot be empty',
+          color: 'negative',
+          icon: 'fas fa-times',
+        });
+        return;
+      }
+
+      subtitle.content[col] = String(value || '');
+      await UpdateSubtitle(subtitle);
+      $q.notify({
+        message: 'Subtitle updated successfully',
+        color: 'primary',
+        icon: 'fas fa-check',
+      });
+    } catch (error) {
+      console.error(error);
+      $q.notify({
+        message: 'Failed to update subtitle',
+        color: 'negative',
+        icon: 'fas fa-times',
+      });
+    }
   };
 
   const onSubmit = async () => {
@@ -219,25 +262,24 @@
       loading.value = true;
       if (!validate()) return;
 
-    // TODO: Implement translation logic
-    const response = await TranslateSubtitles(
-      Number(props.movie.id),
-      sourceLanguage.value,
-      targetLanguage.value
-    );
-
-
-    console.log(
-      'Translating from',
-      sourceLanguage.value,
-      'to',
-      targetLanguage.value
+      const response = await TranslateSubtitles(
+        Number(props.movie.id),
+        sourceLanguage.value,
+        targetLanguage.value
       );
-      console.log(response);
-      // emit('onClose');
+
+      $q.notify({
+        message: 'Subtitles translated successfully',
+        color: 'primary',
+        icon: 'fas fa-check',
+      });
     } catch (error) {
       console.error(error);
-      errors.value = { error: 'Failed to translate subtitles' };
+      $q.notify({
+        message: 'Failed to translate subtitles',
+        color: 'negative',
+        icon: 'fas fa-times',
+      });
     } finally {
       loading.value = false;
     }
@@ -345,10 +387,9 @@
               :readonly="props.col.name === sourceLanguage"
               v-model="props.row[props.col.name]"
               dense
-              autogrow
               outlined
-              @update:model-value="
-                (val) => onCellEdit(props.row, props.col.name, val)
+              @keyup.enter="
+                (event: KeyboardEvent) => onSubtitleUpdate(props.row, props.col.name, props.row[props.col.name], event)
               "
               :disable="loading"
             />

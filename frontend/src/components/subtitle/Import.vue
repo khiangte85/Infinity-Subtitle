@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { ref, computed } from 'vue';
   import { useQuasar } from 'quasar';
-  import { UploadSRTFile } from '../../../wailsjs/go/backend/Subtitle.js';
+  import { ImportFromSRTFile } from '../../../wailsjs/go/backend/Subtitle.js';
   import { backend as models } from '../../../wailsjs/go/models.js';
   import Error from '../Error.vue';
 
@@ -58,9 +58,7 @@
       const content = await selectedFile.value.text();
 
       // Call backend function
-      const response = await UploadSRTFile(props.movie, content);
-      console.log(response);
-
+      const response = await ImportFromSRTFile(props.movie, content);
       emit('onImport');
       emit('onClose');
     } catch (err: any) {

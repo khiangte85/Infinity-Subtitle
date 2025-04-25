@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import router  from './router';
-import { Quasar } from 'quasar';
+import { Quasar, Notify } from 'quasar';
 import App from './App.vue';
 import './style.css';
 
@@ -13,7 +13,9 @@ const app = createApp(App);
 
 app.use(router);
 app.use(Quasar, {
-  plugins: {},
+  plugins: {
+    Notify
+  },
 });
 
 app.mount('#app');

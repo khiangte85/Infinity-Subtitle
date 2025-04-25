@@ -113,7 +113,7 @@ func (s Subtitle) UpdateSubtitle(subtitle Subtitle) error {
 	return nil
 }
 
-func (s Subtitle) UploadSRTFile(movie Movie, fileContent string) error {
+func (s Subtitle) ImportFromSRTFile(movie Movie, fileContent string) error {
 	db := database.GetDB()
 	if db == nil {
 		return errors.New("database connection is nil")

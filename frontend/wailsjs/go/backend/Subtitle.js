@@ -6,14 +6,14 @@ export function GetSubtitlesByMovieID(arg1, arg2) {
   return window['go']['backend']['Subtitle']['GetSubtitlesByMovieID'](arg1, arg2);
 }
 
+export function ImportFromSRTFile(arg1, arg2) {
+  return window['go']['backend']['Subtitle']['ImportFromSRTFile'](arg1, arg2);
+}
+
 export function TranslateSubtitles(arg1, arg2, arg3) {
   return window['go']['backend']['Subtitle']['TranslateSubtitles'](arg1, arg2, arg3);
 }
 
 export function UpdateSubtitle(arg1) {
   return window['go']['backend']['Subtitle']['UpdateSubtitle'](arg1);
-}
-
-export function UploadSRTFile(arg1, arg2) {
-  return window['go']['backend']['Subtitle']['UploadSRTFile'](arg1, arg2);
 }

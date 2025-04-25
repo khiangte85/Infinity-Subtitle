@@ -3,11 +3,16 @@
   import { onMounted, ref } from 'vue';
   import { backend as models } from '../../wailsjs/go/models.js';
   import { GetMovieByID } from '../../wailsjs/go/backend/Movie.js';
-  import { GetSubtitlesByMovieID } from '../../wailsjs/go/backend/Subtitle.js';
+  import {
+    GetSubtitlesByMovieID,
+    UpdateSubtitle,
+  } from '../../wailsjs/go/backend/Subtitle.js';
   import ImportSubtitle from '../components/subtitle/Import.vue';
   import TranslateSubtitle from '../components/subtitle/Translate.vue';
   import { useRouter } from 'vue-router';
+  import { useQuasar } from 'quasar';
 
+  const $q = useQuasar();
   const router = useRouter();
   const movieId = router.currentRoute.value.params.id;
 
@@ -163,21 +168,44 @@
     });
   };
 
-  const onCellEdit = async (
+  const onSubtitleUpdate = async (
     row: SubtitleRow,
     col: string,
-    value: string | number | null
+    value: string | number | null,
+    event: KeyboardEvent
   ) => {
-    if (!movie.value) return;
+    try {
+      if (!movie.value) return;
+      if (event.key !== 'Enter') return;
 
-    const subtitle = subtitles.value.find((s) => s.id === row.id);
-    if (!subtitle) return;
+      const subtitle = subtitles.value.find((s) => s.id === row.id);
+      if (!subtitle) return;
 
-    // Update the content
-    subtitle.content[col] = String(value || '');
+      if (value === null || value === undefined || value === '') {
+        $q.notify({
+          message: 'Subtitle cannot be empty',
+          color: 'negative',
+          icon: 'fas fa-times',
+        });
+        return;
+      }
+      // Update the content
+      subtitle.content[col] = String(value || '');
+      await UpdateSubtitle(subtitle);
 
-    // TODO: Call backend to update subtitle
-    // await UpdateSubtitle(subtitle);
+      $q.notify({
+        message: 'Subtitle updated successfully',
+        color: 'primary',
+        icon: 'fas fa-check',
+      });
+    } catch (error) {
+      $q.notify({
+        message: 'Failed to update subtitle',
+        color: 'negative',
+        icon: 'fas fa-times',
+      });
+      console.error(error);
+    }
   };
 </script>
 
@@ -297,10 +325,9 @@
           :readonly="props.col.name == movie?.default_language"
           v-model="props.row[props.col.name]"
           dense
-          autogrow
           outlined
-          @update:model-value="
-            (val) => onCellEdit(props.row, props.col.name, val)
+          @keyup.enter="
+            (event: KeyboardEvent) => onSubtitleUpdate(props.row, props.col.name, props.row[props.col.name], event)
           "
         />
       </q-td>
@@ -328,7 +355,18 @@
   >
     <TranslateSubtitle
       :movie="movie as models.Movie"
-      @onClose="showTranslate = false"
+      @onClose="
+        () => {
+          showTranslate = false;
+          onRequest({ pagination });
+        }
+      "
+      @onTranslate="
+        () => {
+          showTranslate = false;
+          onRequest({ pagination });
+        }
+      "
     />
   </q-dialog>
 </template>

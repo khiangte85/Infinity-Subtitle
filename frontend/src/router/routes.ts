@@ -3,16 +3,6 @@ import { RouteRecordRaw } from 'vue-router';
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'Dashboard',
-    meta: {
-      title: 'Dashboard',
-      icon: 'fas fa-tv',
-      show: true,
-    },
-    component: () => import('../pages/Dashboard.vue'),
-  },
-  {
-    path: '/movies',
     name: 'Movies',
     meta: {
       title: 'Movies',

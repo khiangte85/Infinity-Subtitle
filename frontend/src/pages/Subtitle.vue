@@ -6,6 +6,7 @@
   import {
     GetSubtitlesByMovieID,
     UpdateSubtitle,
+    ExportSubtitle,
   } from '../../wailsjs/go/backend/Subtitle.js';
   import ImportSubtitle from '../components/subtitle/Import.vue';
   import TranslateSubtitle from '../components/subtitle/Translate.vue';
@@ -207,6 +208,31 @@
       console.error(error);
     }
   };
+
+  const onExport = async () => {
+    try {
+      loading.value = true;
+      await ExportSubtitle(
+        Number(movieId),
+        movie.value?.default_language || ''
+      );
+      $q.notify({
+        message: 'Subtitles exported successfully to exports directory',
+        color: 'primary',
+        icon: 'fas fa-check',
+        timeout: 3000,
+      });
+    } catch (error) {
+      console.error(error);
+      $q.notify({
+        message: 'Failed to export subtitles',
+        color: 'negative',
+        icon: 'fas fa-times',
+      });
+    } finally {
+      loading.value = false;
+    }
+  };
 </script>
 
 <template>
@@ -217,18 +243,40 @@
     <q-card-section class="q-py-sm q-pl-none">
       <h6 class="text-h6">{{ movie?.title }}'s Subtitles</h6>
     </q-card-section>
-    <q-space />
     <q-card-section class="q-py-sm">
-      <q-btn
-        round
-        unelevated
-        color="primary"
-        icon="fas fa-plus"
-        size="sm"
-        @click="showImport = true"
-      >
-        <q-tooltip> Import default language subtitle </q-tooltip>
-      </q-btn>
+      <div class="row q-gutter-md justify-end">
+        <q-btn
+          round
+          unelevated
+          color="primary"
+          icon="fas fa-file-import"
+          size="sm"
+          @click="showImport = true"
+        >
+          <q-tooltip> Import default language subtitle </q-tooltip>
+        </q-btn>
+        <q-btn
+          round
+          unelevated
+          color="primary"
+          icon="fas fa-language"
+          size="sm"
+          @click="showTranslate = true"
+        >
+          <q-tooltip> Translate subtitles </q-tooltip>
+        </q-btn>
+        <q-btn
+          round
+          unelevated
+          color="primary"
+          icon="fas fa-download"
+          size="sm"
+          @click="onExport"
+          :loading="loading"
+        >
+          <q-tooltip> Export subtitles to SRT files </q-tooltip>
+        </q-btn>
+      </div>
     </q-card-section>
   </q-card>
 
@@ -236,14 +284,7 @@
     flat
     class="full-width row justify-between items-center q-py-md q-pb-md"
   >
-    <div class="row q-gutter-md">
-      <q-btn
-        color="primary"
-        icon="fas fa-language"
-        label="Translate"
-        @click="showTranslate = true"
-      />
-    </div>
+    <q-space />
     <div class="row q-gutter-md">
       <q-select
         v-if="movie?.languages"

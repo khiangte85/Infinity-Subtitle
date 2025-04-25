@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"infinity-subtitle/backend/database"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	// "strconv"
@@ -307,6 +309,87 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		}
 
 		pagination.Page++
+	}
+
+	return nil
+}
+
+func (s Subtitle) ExportSubtitle(movieId int, language string) error {
+	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection is nil")
+	}
+
+	// Get all subtitles for the movie
+	rows, err := db.Query(`
+		SELECT id, movie_id, sl_no, start_time, end_time, content, created_at, updated_at 
+		FROM subtitles 
+		WHERE movie_id = ? 
+		ORDER BY sl_no ASC
+	`, movieId)
+	if err != nil {
+		return fmt.Errorf("failed to get subtitles: %w", err)
+	}
+	defer rows.Close()
+
+	var subtitles []Subtitle
+	for rows.Next() {
+		var subtitle Subtitle
+		var contentJson []byte
+		err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &subtitle.SlNo, &subtitle.StartTime, &subtitle.EndTime, &contentJson, &subtitle.CreatedAt, &subtitle.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to scan subtitle: %w", err)
+		}
+
+		err = json.Unmarshal(contentJson, &subtitle.Content)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal content: %w", err)
+		}
+		subtitles = append(subtitles, subtitle)
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("error iterating subtitles: %w", err)
+	}
+
+	// Create export directory if it doesn't exist
+	exportDir := "exports"
+	if err := os.MkdirAll(exportDir, 0755); err != nil {
+		return fmt.Errorf("failed to create export directory: %w", err)
+	}
+
+	// Get movie details
+	movie := NewMovie()
+	movie, err = movie.GetMovieByID(movieId)
+	if err != nil {
+		return fmt.Errorf("failed to get movie: %w", err)
+	}
+
+	// Create SRT file for each language
+	for langCode := range movie.Languages {
+		fileName := filepath.Join(exportDir, fmt.Sprintf("%s_%s.srt", movie.Title, langCode))
+		file, err := os.Create(fileName)
+		if err != nil {
+			return fmt.Errorf("failed to create export file: %w", err)
+		}
+		defer file.Close()
+
+		// Write subtitles in SRT format
+		for _, subtitle := range subtitles {
+			content := subtitle.Content[langCode]
+			if content == "" {
+				continue
+			}
+
+			// Write subtitle number
+			fmt.Fprintf(file, "%d\n", subtitle.SlNo)
+
+			// Write time
+			fmt.Fprintf(file, "%s --> %s\n", subtitle.StartTime, subtitle.EndTime)
+
+			// Write content
+			fmt.Fprintf(file, "%s\n\n", content)
+		}
 	}
 
 	return nil

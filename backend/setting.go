@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	_ "github.com/joho/godotenv/autoload"
 )
 
 type Setting struct{}
@@ -58,20 +60,5 @@ func (s *Setting) SaveOpenAIKey(key string) error {
 }
 
 func (s *Setting) GetOpenAIKey() (string, error) {
-	content, err := os.ReadFile(".env")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", fmt.Errorf("failed to read .env file: %w", err)
-	}
-
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "OPENAI_API_KEY=") {
-			return strings.TrimPrefix(line, "OPENAI_API_KEY="), nil
-		}
-	}
-
-	return "", nil
+	return os.Getenv("OPENAI_API_KEY"), nil
 }

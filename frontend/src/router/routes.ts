@@ -31,6 +31,16 @@ const routes: RouteRecordRaw[] = [
     },
     component: () => import('../pages/Languages.vue'),
   },
+  {
+    path: '/settings',
+    name: 'Settings',
+    meta: {
+      title: 'Settings',
+      icon: 'fas fa-cog',
+      show: true,
+    },
+    component: () => import('../pages/Settings.vue'),
+  },
 ];
 
 export default routes;

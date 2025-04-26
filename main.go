@@ -18,6 +18,7 @@ func main() {
 	language := backend.NewLanguage()
 	movie := backend.NewMovie()
 	subtitle := backend.NewSubtitle()
+	setting := backend.NewSetting()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -35,6 +36,7 @@ func main() {
 			language,
 			movie,
 			subtitle,
+			setting,
 		},
 		AlwaysOnTop: false,
 	})

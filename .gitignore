@@ -5,3 +5,4 @@ infinity-subtitle.db
 models/*
 logs/*
 subtitles
+.env

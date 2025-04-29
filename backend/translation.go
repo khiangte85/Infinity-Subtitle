@@ -68,7 +68,7 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 		prompt += fmt.Sprintf("- %s\n", text)
 	}
 
-	prompt += "\nOutput format should be a JSON string that can be Unmarshalable by Golang with the same keys as input, " +
+	prompt += "\nOutput format should be a JSON string with the same keys as input (DO NOT CHANGE THE KEYS), " +
 		"containing only the translations. Do not include ```json ```."
 
 	ts.logger.Info("Translation prompt: %s", prompt)
@@ -106,6 +106,9 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 }
 
 func (ts *TranslationService) processBatch(ctx context.Context, texts map[string]string, sourceLang, targetLang string) map[string]string {
+	ts.logger.Info("Processing batch of %d texts", len(texts))
+	ts.logger.Info("Text to translate: %+v", texts)
+
 	var wg sync.WaitGroup
 	results := make(map[string]string)
 	mu := sync.Mutex{}

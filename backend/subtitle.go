@@ -261,7 +261,7 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 	for rows.Next() {
 		var subtitle Subtitle
 		var contentJson []byte
-		err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &subtitle.SlNo, &subtitle.StartTime, &subtitle.EndTime, &contentJson, &subtitle.CreatedAt, &subtitle.UpdatedAt)
+		err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &contentJson)
 		if err != nil {
 			return fmt.Errorf("failed to scan subtitle: %w", err)
 		}

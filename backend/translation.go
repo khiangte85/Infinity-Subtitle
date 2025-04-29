@@ -14,6 +14,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"golang.org/x/exp/maps"
 	"golang.org/x/time/rate"
+	"runtime"
 )
 
 type TranslationService struct {
@@ -62,18 +63,20 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	prompt := fmt.Sprintf("Translate the following texts from %s to %s. Only output the translations in JSON format with the same keys as input.\n\nTexts to translate:\n", sourceLang, targetLang)
+	prompt := fmt.Sprintf("Translate the following texts from %s to %s.\nTexts to translate:\n", sourceLang, targetLang)
 	for text := range texts {
 		prompt += fmt.Sprintf("- %s\n", text)
 	}
-	prompt += "\nOutput format should be a JSON object with the same keys as input, containing only the translations."
+
+	prompt += "\nOutput format should be a JSON string that can be Unmarshalable by Golang with the same keys as input, " +
+		"containing only the translations. Do not include ```json ```."
 
 	ts.logger.Info("Translation prompt: %s", prompt)
 
 	resp, err := ts.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
-			Model: openai.GPT3Dot5Turbo,
+			Model: openai.GPT4oMini,
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleUser,
@@ -107,8 +110,8 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 	results := make(map[string]string)
 	mu := sync.Mutex{}
 
-	// Split texts into batches of 10
-	batchSize := 10
+	// Split texts into batches of 20
+	batchSize := 20
 	batches := make([]map[string]string, 0)
 	currentBatch := make(map[string]string)
 
@@ -124,7 +127,7 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 	}
 
 	// Fan-out: Create multiple workers
-	workerCount := 5
+	workerCount := runtime.NumCPU()
 	batchChan := make(chan map[string]string, len(batches))
 	resultChan := make(chan map[string]string, len(batches))
 
@@ -137,7 +140,7 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 				translations, err := ts.translate(ctx, batch, sourceLang, targetLang)
 				if err == nil {
 					resultChan <- translations
-				}
+				} 
 			}
 		}()
 	}
@@ -161,7 +164,7 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 		mu.Unlock()
 	}
 
-	ts.logger.Info("Completed translations: %v", results)
+	ts.logger.Info("Completed translations: %+v", results)
 
 	return results
 }

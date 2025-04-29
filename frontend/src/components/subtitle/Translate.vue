@@ -268,8 +268,10 @@
         targetLanguage.value
       );
 
+      onRequest({ pagination: pagination.value });
+
       $q.notify({
-        message: 'Subtitles translated successfully',
+        message: 'Subtitles translation completed',
         color: 'primary',
         icon: 'fas fa-check',
       });

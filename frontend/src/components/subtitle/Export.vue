@@ -154,7 +154,7 @@
         class="q-px-md"
         @click="emit('onClose')"
         :disable="loading"
-        >Cancel</q-btn
+        >Close</q-btn
       >
       <q-btn
         color="primary"

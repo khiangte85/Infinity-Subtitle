@@ -18,15 +18,13 @@ type Logger struct {
 
 var (
 	instance *Logger
-	once     sync.Once
+	//once     sync.Once // not needed as we are using a new logger for each instance
 )
 
 // GetLogger returns a singleton instance of Logger
 func GetLogger() (*Logger, error) {
 	var err error
-	once.Do(func() {
-		instance, err = newLogger()
-	})
+	instance, err = newLogger()
 	return instance, err
 }
 

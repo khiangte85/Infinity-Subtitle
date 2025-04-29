@@ -115,8 +115,8 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 	batches := make([]map[string]string, 0)
 	currentBatch := make(map[string]string)
 
-	for text := range texts {
-		currentBatch[text] = ""
+	for srcKey := range texts {
+		currentBatch[srcKey] = ""
 		if len(currentBatch) >= batchSize {
 			batches = append(batches, currentBatch)
 			currentBatch = make(map[string]string)

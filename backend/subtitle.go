@@ -245,74 +245,90 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 
 	ctx := context.Background()
 
-	isNextPage := true
-	pagination := Pagination{
-		Page:        1,
-		RowsPerPage: 100,
+	// Get all subtitles for the movie
+	rows, err := db.Query(`
+		SELECT id, movie_id, content
+		FROM subtitles 
+		WHERE movie_id = ? 
+		ORDER BY sl_no ASC
+	`, movieId)
+	if err != nil {
+		return fmt.Errorf("failed to get subtitles: %w", err)
 	}
+	defer rows.Close()
 
-	for isNextPage {
-		data, err := s.GetSubtitlesByMovieID(movieId, pagination)
+	var subtitles []Subtitle
+	for rows.Next() {
+		var subtitle Subtitle
+		var contentJson []byte
+		err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &subtitle.SlNo, &subtitle.StartTime, &subtitle.EndTime, &contentJson, &subtitle.CreatedAt, &subtitle.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to get subtitles: %w", err)
+			return fmt.Errorf("failed to scan subtitle: %w", err)
 		}
 
-		if len(data.Subtitles) == 0 {
-			isNextPage = false
+		err = json.Unmarshal(contentJson, &subtitle.Content)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal content: %w", err)
+		}
+		subtitles = append(subtitles, subtitle)
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("error iterating subtitles: %w", err)
+	}
+
+	if len(subtitles) == 0 {
+		return nil
+	}
+
+	// Collect unique texts for translation
+	textsToTranslate := make(map[string]string)
+
+	for _, subtitle := range subtitles {
+		srcKey := subtitle.Content[sourceLanguage]
+		if srcKey == "" {
 			continue
 		}
 
-		// Collect unique texts for translation
-		textsToTranslate := make(map[string]string)
-
-		for _, subtitle := range data.Subtitles {
-			text := subtitle.Content[sourceLanguage]
-			if text == "" {
-				continue
-			}
-
-			if _, ok := textsToTranslate[text]; !ok {
-				textsToTranslate[text] = ""
-			}
+		if _, ok := textsToTranslate[srcKey]; !ok {
+			textsToTranslate[srcKey] = ""
 		}
+	}
 
-		// Process translations in parallel
-		sourceLangFullText := movie.Languages[sourceLanguage]
-		targetLangFullText := movie.Languages[targetLanguage]
-		translations := translationService.processBatch(ctx, textsToTranslate, sourceLangFullText, targetLangFullText)
+	// Process translations in parallel
+	sourceLangFullText := movie.Languages[sourceLanguage]
+	targetLangFullText := movie.Languages[targetLanguage]
+	translations := translationService.processBatch(ctx, textsToTranslate, sourceLangFullText, targetLangFullText)
 
-		// Update subtitles with translations
-		tx, err := db.Begin()
+	// Update subtitles with translations
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	for _, subtitle := range subtitles {
+		srcKey := subtitle.Content[sourceLanguage]
+		if srcKey == "" {
+			continue
+		}
+		translated := translations[srcKey]
+		if translated == "" {
+			continue
+		}
+		_, err = tx.Exec(`
+			UPDATE subtitles 
+			SET content = json_set(content, '$.' || ?, ?),
+				updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, targetLanguage, translated, subtitle.ID)
 		if err != nil {
-			return fmt.Errorf("failed to begin transaction: %w", err)
+			tx.Rollback()
+			return fmt.Errorf("failed to update subtitle: %w", err)
 		}
+	}
 
-		for _, subtitle := range data.Subtitles {
-			text := subtitle.Content[sourceLanguage]
-			if text == "" {
-				continue
-			}
-			translated := translations[text]
-			if translated == "" {
-				continue
-			}
-			_, err = tx.Exec(`
-				UPDATE subtitles 
-				SET content = json_set(content, '$.' || ?, ?),
-					updated_at = CURRENT_TIMESTAMP
-				WHERE id = ?
-			`, targetLanguage, translated, subtitle.ID)
-			if err != nil {
-				tx.Rollback()
-				return fmt.Errorf("failed to update subtitle: %w", err)
-			}
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("failed to commit transaction: %w", err)
-		}
-
-		pagination.Page++
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

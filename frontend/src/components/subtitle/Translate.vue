@@ -231,6 +231,11 @@
       const subtitle = subtitles.value.find((s) => s.id === row.id);
       if (!subtitle) return;
 
+      console.log(subtitle);
+      console.log(row);
+      console.log(col);
+      console.log(value);
+
       if (value === null || value === undefined || value === '') {
         $q.notify({
           message: 'Subtitle cannot be empty',
@@ -267,6 +272,8 @@
         sourceLanguage.value,
         targetLanguage.value
       );
+
+      rows.value = [];
 
       onRequest({ pagination: pagination.value });
 

@@ -160,6 +160,8 @@
   const setupRows = () => {
     if (!subtitles.value || !movie.value) return;
 
+    rows.value = [];
+
     rows.value = subtitles.value.map((subtitle) => {
       const row: SubtitleRow = {
         id: subtitle.id,
@@ -357,7 +359,10 @@
   <q-dialog v-model="showImport">
     <ImportSubtitle
       :movie="movie as models.Movie"
-      @onClose="showImport = false"
+      @onClose="() => {
+        showImport = false;
+        onRequest({ pagination });
+      }"
       @onImport="
         () => {
           showImport = false;
@@ -377,12 +382,14 @@
       :movie="movie as models.Movie"
       @onClose="
         () => {
+          rows = [];
           showTranslate = false;
           onRequest({ pagination });
         }
       "
       @onTranslate="
         () => {
+          rows = [];
           showTranslate = false;
           onRequest({ pagination });
         }

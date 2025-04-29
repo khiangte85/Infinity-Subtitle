@@ -27,7 +27,7 @@
     sortBy: 'sl_no',
     descending: false,
     page: 1,
-    rowsPerPage: 20,
+    rowsPerPage: 10,
     rowsNumber: 0,
   });
 
@@ -83,7 +83,7 @@
 
     rows.value = subtitles.value.map((subtitle) => {
       const row: any = {
-        id: subtitle.id,
+        row_id: subtitle.id,
         sl_no: subtitle.sl_no,
         time: `${subtitle.start_time} - ${subtitle.end_time}`,
       };
@@ -228,13 +228,8 @@
       row[col] = String(value || '');
 
       // Find the subtitle and update it
-      const subtitle = subtitles.value.find((s) => s.id === row.id);
+      const subtitle = subtitles.value.find((s) => s.id === row.row_id);
       if (!subtitle) return;
-
-      console.log(subtitle);
-      console.log(row);
-      console.log(col);
-      console.log(value);
 
       if (value === null || value === undefined || value === '') {
         $q.notify({
@@ -267,7 +262,7 @@
       loading.value = true;
       if (!validate()) return;
 
-      const response = await TranslateSubtitles(
+      await TranslateSubtitles(
         Number(props.movie.id),
         sourceLanguage.value,
         targetLanguage.value

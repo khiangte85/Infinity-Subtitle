@@ -32,15 +32,13 @@
     sortBy: 'sl_no',
     descending: false,
     page: 1,
-    rowsPerPage: 20,
+    rowsPerPage: 10,
     rowsNumber: 0,
   });
 
-  const exportLanguage = ref<string>('');
-  const exportFilePath = ref<string>('');
 
   interface SubtitleRow {
-    id: number;
+    row_id: number;
     sl_no: number;
     time: string;
     [key: string]: string | number;
@@ -164,7 +162,7 @@
 
     rows.value = subtitles.value.map((subtitle) => {
       const row: SubtitleRow = {
-        id: subtitle.id,
+        row_id: subtitle.id,
         sl_no: subtitle.sl_no,
         time: `${subtitle.start_time} - ${subtitle.end_time}`,
       };
@@ -186,7 +184,7 @@
       if (!movie.value) return;
       if (event.key !== 'Enter') return;
 
-      const subtitle = subtitles.value.find((s) => s.id === row.id);
+      const subtitle = subtitles.value.find((s) => s.id === row.row_id);
       if (!subtitle) return;
 
       if (value === null || value === undefined || value === '') {

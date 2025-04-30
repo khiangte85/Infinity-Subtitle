@@ -29,23 +29,23 @@ func NewMovie() *Movie {
 	}
 }
 
-func (m Movie) CreateMovie(title string, defaultLanguage string, languages map[string]string) error {
+func (m Movie) CreateMovie(title string, defaultLanguage string, languages map[string]string) (Movie, error) {
 	// Input validation
 	if strings.TrimSpace(title) == "" {
-		return errors.New("title is required")
+		return Movie{}, errors.New("title is required")
 	}
 
 	if strings.TrimSpace(defaultLanguage) == "" {
-		return errors.New("default language is required")
+		return Movie{}, errors.New("default language is required")
 	}
 
 	if len(languages) == 0 {
-		return errors.New("subtitle languages are required")
+		return Movie{}, errors.New("subtitle languages are required")
 	}
 
 	jsonLanguages, err := json.Marshal(languages)
 	if err != nil {
-		return fmt.Errorf("failed to marshal languages: %w", err)
+		return Movie{}, fmt.Errorf("failed to marshal languages: %w", err)
 	}
 
 	m.Title = title
@@ -53,19 +53,27 @@ func (m Movie) CreateMovie(title string, defaultLanguage string, languages map[s
 
 	db := database.GetDB()
 	if db == nil {
-		return errors.New("database connection is nil")
+		return Movie{}, errors.New("database connection is nil")
 	}
 
-	_, err = db.Exec("INSERT INTO movies (title, default_language, languages) VALUES (?, ?, ?)",
+	row, err := db.Exec("INSERT INTO movies (title, default_language, languages) VALUES (?, ?, ?)",
 		m.Title,
 		m.DefaultLanguage,
 		jsonLanguages,
 	)
+
 	if err != nil {
-		return fmt.Errorf("failed to insert movie: %w", err)
+		return Movie{}, fmt.Errorf("failed to insert movie: %w", err)
 	}
 
-	return nil
+	id, err := row.LastInsertId()
+	if err != nil {
+		return Movie{}, fmt.Errorf("failed to get last insert id: %w", err)
+	}
+
+	m.ID = int(id)
+
+	return m, nil
 }
 
 func (m Movie) GetMovieByID(id int) (*Movie, error) {

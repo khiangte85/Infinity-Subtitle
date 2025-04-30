@@ -175,8 +175,7 @@ func (s Subtitle) ImportFromSRTFile(movie Movie, fileContent string) error {
 	}
 
 	// delete all subtitles for the movie
-	var err error
-	_, err = db.Exec("DELETE FROM subtitles WHERE movie_id = ?", movie.ID)
+	_, err := db.Exec("DELETE FROM subtitles WHERE movie_id = ?", movie.ID)
 	if err != nil {
 		return fmt.Errorf("failed to delete existing subtitles: %w", err)
 	}

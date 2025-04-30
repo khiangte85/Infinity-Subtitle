@@ -3,7 +3,9 @@
   import { useQuasar } from 'quasar';
   import Error from '../Error.vue';
   import { backend } from '../../../wailsjs/go/models';
+  import { AddToQueue } from '../../../wailsjs/go/backend/MovieQueue';
   import { GetAllLanguages } from '../../../wailsjs/go/backend/Language';
+  import { EventsEmit } from '../../../wailsjs/runtime';
 
   interface SelectedFile {
     file: File;
@@ -23,6 +25,40 @@
   const files = ref<File[]>([]);
   const selectedFiles = ref<SelectedFile[]>([]);
   const languages = ref<backend.Language[]>([]);
+
+  onMounted(() => {
+    getLanguages();
+  });
+
+  const canSave = computed(() => {
+    if (selectedFiles.value.length === 0) {
+      return false;
+    }
+
+    return (
+      selectedFiles.value.every(
+        (file) =>
+          file.name &&
+          file.sourceLanguage &&
+          file.targetLanguage &&
+          file.sourceLanguage !== file.targetLanguage
+      ) && Object.keys(errors.value).length === 0
+    );
+  });
+
+  const onFilesSelected = () => {
+    if (!files.value || files.value.length === 0) {
+      selectedFiles.value = [];
+      return;
+    }
+
+    selectedFiles.value = files.value.map((file) => ({
+      file,
+      name: file.name.replace('.srt', ''),
+      sourceLanguage: '',
+      targetLanguage: '',
+    }));
+  };
 
   const validateSourceLanguage = (src: string) => {
     const index = selectedFiles.value.findIndex(
@@ -65,40 +101,6 @@
     }
   };
 
-  onMounted(() => {
-    getLanguages();
-  });
-
-  const onFilesSelected = () => {
-    if (!files.value || files.value.length === 0) {
-      selectedFiles.value = [];
-      return;
-    }
-
-    selectedFiles.value = files.value.map((file) => ({
-      file,
-      name: file.name.replace('.srt', ''),
-      sourceLanguage: '',
-      targetLanguage: '',
-    }));
-  };
-
-  const canSave = computed(() => {
-    if (selectedFiles.value.length === 0) {
-      return false;
-    }
-
-    return (
-      selectedFiles.value.every(
-        (file) =>
-          file.name &&
-          file.sourceLanguage &&
-          file.targetLanguage &&
-          file.sourceLanguage !== file.targetLanguage
-      ) && Object.keys(errors.value).length === 0
-    );
-  });
-
   const saveToQueue = async () => {
     if (Object.keys(errors.value).length > 0) {
       $q.notify({
@@ -110,15 +112,18 @@
 
     try {
       saving.value = true;
-      for (const file of selectedFiles.value) {
-        const content = await file.file.text();
-        await window.backend.MovieQueue.AddToQueue({
+      const req: backend.AddToQueueRequest[] = await Promise.all(
+        selectedFiles.value.map(async (file) => ({
           name: file.name,
-          content,
+          content: await file.file.text(),
           source_language: file.sourceLanguage,
           target_language: file.targetLanguage,
-        });
-      }
+        }))
+      );
+
+      await AddToQueue(req);
+
+      EventsEmit('on-queue-added', req);
 
       $q.notify({
         color: 'positive',
@@ -193,11 +198,12 @@
         <q-card-section
           v-for="(file, index) in selectedFiles"
           :key="index"
-          class="q-mb-md"
+          class="q-pb-none"
         >
           <div class="row q-col-gutter-md">
             <div class="col-6">
               <q-input
+                dense
                 v-model="file.name"
                 outlined
                 label="Movie Name"
@@ -206,6 +212,7 @@
             </div>
             <div class="col-3">
               <q-select
+                dense
                 outlined
                 v-model="file.sourceLanguage"
                 :options="languages"
@@ -213,13 +220,14 @@
                 option-label="name"
                 emit-value
                 map-options
-                label="Source Language"
-                :rules="[(val) => !!val || 'Source language is required']"
+                label="Subtitle Language"
+                :rules="[(val) => !!val || 'Subtitle language is required']"
                 @update:model-value="validateSourceLanguage"
               />
             </div>
             <div class="col-3">
               <q-select
+                dense
                 outlined
                 v-model="file.targetLanguage"
                 :options="languages"

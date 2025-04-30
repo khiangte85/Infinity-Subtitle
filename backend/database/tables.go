@@ -94,13 +94,14 @@ func createMoviesQueueTable(db *sql.DB) error {
 	_, err := db.Exec(`
 	CREATE TABLE IF NOT EXISTS movies_queue (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		movie_id INTEGER,
 		name TEXT NOT NULL,
 		content LONGTEXT NOT NULL,
 		source_language TEXT NOT NULL,
 		target_language TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		processed_at DATETIME DEFAULT NULL,
-		status SMALLINT NOT NULL DEFAULT 0,
+		status SMALLINT NOT NULL DEFAULT 0
 	)`)
 
 	if err != nil {

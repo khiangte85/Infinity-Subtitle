@@ -1,21 +1,27 @@
 package backend
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"infinity-subtitle/backend/database"
+	"infinity-subtitle/backend/logger"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type MovieQueue struct {
-	ID             int        `json:"id"`
-	Name           string     `json:"name"`
-	Content        string     `json:"content"`
-	SourceLanguage string     `json:"source_language"`
-	TargetLanguage string     `json:"target_language"`
-	Status         int        `json:"status"`
-	CreatedAt      time.Time  `json:"created_at"`
-	ProcessedAt    *time.Time `json:"processed_at"`
+	ID             int           `json:"id"`
+	MovieID        sql.NullInt64 `json:"movie_id"`
+	Name           string        `json:"name"`
+	Content        string        `json:"content"`
+	SourceLanguage string        `json:"source_language"`
+	TargetLanguage string        `json:"target_language"`
+	Status         int           `json:"status"`
+	CreatedAt      time.Time     `json:"created_at"`
+	ProcessedAt    *time.Time    `json:"processed_at"`
 }
 
 type MovieQueueResponse struct {
@@ -30,34 +36,63 @@ type AddToQueueRequest struct {
 	TargetLanguage string `json:"target_language"`
 }
 
+const (
+	MovieQueueStatusPending = iota
+	MovieQueueStatusMovieCreated
+	MovieQueueStatusSubtitleCreated
+	MovieQueueStatusSubtitleTranslated
+	MovieQueueStatusFailed
+)
+
 func NewMovieQueue() *MovieQueue {
 	return &MovieQueue{}
 }
 
-func (mq *MovieQueue) GetQueue(pagination Pagination) (MovieQueueResponse, error) {
+func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueResponse, error) {
 	db := database.GetDB()
 	var response MovieQueueResponse
 	var movies []MovieQueue
 
-	// Get total count
+	query := "SELECT COUNT(*) FROM movies_queue"
+	args := []any{}
+	if name != "" {
+		query += " WHERE name LIKE ?"
+		args = append(args, "%"+name+"%")
+	}
+
+	row := db.QueryRow(query, args...)
 	var total int
-	err := db.QueryRow("SELECT COUNT(*) FROM movies_queue").Scan(&total)
+	err := row.Scan(&total)
 	if err != nil {
 		return response, fmt.Errorf("failed to get total count: %w", err)
 	}
+	pagination.RowsNumber = total
 
-	// Calculate offset
 	offset := (pagination.Page - 1) * pagination.RowsPerPage
 
-	// Get paginated movies
-	rows, err := db.Query(`
-		SELECT id, name, source_language, target_language, status, created_at, processed_at 
-		FROM movies_queue 
-		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?
-	`, pagination.RowsPerPage, offset)
+	query = "SELECT id, movie_id, name, source_language, target_language, status, created_at, processed_at FROM movies_queue"
+	if name != "" {
+		query += " WHERE name LIKE ?"
+		args = append(args, "%"+name+"%")
+	}
+
+	// Handle sorting
+	if pagination.SortBy != "" {
+		query += " ORDER BY " + pagination.SortBy
+		if pagination.Descending {
+			query += " DESC"
+		} else {
+			query += " ASC"
+		}
+	}
+
+	// Add pagination
+	query += " LIMIT ? OFFSET ?"
+	args = append(args, pagination.RowsPerPage, offset)
+
+	rows, err := db.Query(query, args...)
 	if err != nil {
-		return response, err
+		return response, fmt.Errorf("failed to get movies: %w", err)
 	}
 	defer rows.Close()
 
@@ -66,6 +101,7 @@ func (mq *MovieQueue) GetQueue(pagination Pagination) (MovieQueueResponse, error
 		var processedAt sql.NullTime
 		err := rows.Scan(
 			&movie.ID,
+			&movie.MovieID,
 			&movie.Name,
 			&movie.SourceLanguage,
 			&movie.TargetLanguage,
@@ -74,43 +110,49 @@ func (mq *MovieQueue) GetQueue(pagination Pagination) (MovieQueueResponse, error
 			&processedAt,
 		)
 		if err != nil {
-			return response, err
+			return response, fmt.Errorf("failed to scan movie: %w", err)
 		}
 		if processedAt.Valid {
 			movie.ProcessedAt = &processedAt.Time
 		}
+
 		movies = append(movies, movie)
 	}
 
 	if err = rows.Err(); err != nil {
-		return response, err
+		return response, fmt.Errorf("failed to get movies: %w", err)
 	}
 
 	response = MovieQueueResponse{
-		Movies: movies,
-		Pagination: Pagination{
-			SortBy:      pagination.SortBy,
-			Descending:  pagination.Descending,
-			Page:        pagination.Page,
-			RowsPerPage: pagination.RowsPerPage,
-			RowsNumber:  total,
-		},
+		Movies:     movies,
+		Pagination: pagination,
 	}
 
 	return response, nil
 }
 
-func (mq *MovieQueue) AddToQueue(req AddToQueueRequest) error {
+func (mq *MovieQueue) AddToQueue(req []AddToQueueRequest) error {
 	db := database.GetDB()
-
-	_, err := db.Exec(`
+	// bulk insert
+	stmt, err := db.Prepare(`
 		INSERT INTO movies_queue (
 			name, content, source_language, target_language, status, created_at
 		) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
-	`, req.Name, req.Content, req.SourceLanguage, req.TargetLanguage)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, r := range req {
+		_, err = stmt.Exec(r.Name, r.Content, r.SourceLanguage, r.TargetLanguage)
+		if err != nil {
+			return fmt.Errorf("failed to add movie to queue: %w", err)
+		}
+	}
 
 	if err != nil {
-		return fmt.Errorf("failed to add movie to queue: %w", err)
+		return fmt.Errorf("failed to add movies to queue: %w", err)
 	}
 
 	return nil
@@ -125,4 +167,154 @@ func (mq *MovieQueue) DeleteFromQueue(id int) error {
 	}
 
 	return nil
+}
+
+func CreateMovieFromQueue(ctx context.Context) {
+	db := database.GetDB()
+
+	logger, err := logger.GetLogger()
+	if err != nil {
+		logger.Error("failed to get logger: %w", err)
+	}
+
+	lang := NewLanguage()
+	langs, err := lang.GetAllLanguages()
+	if err != nil {
+		logger.Error("failed to get languages: %w", err)
+	}
+
+	langMap := make(map[string]string)
+	for _, lang := range langs {
+		langMap[lang.Code] = lang.Name
+	}
+
+	m := NewMovie()
+
+	rows, err := db.Query(`
+		SELECT id, name, content, source_language, target_language 
+		FROM movies_queue 
+		WHERE movie_id IS NULL
+		AND status = ?
+	`, MovieQueueStatusPending)
+	if err != nil {
+		logger.Error("failed to get movies from queue: %w", err)
+	}
+	defer rows.Close()
+
+	var movies []MovieQueue
+
+	for rows.Next() {
+		var mq MovieQueue
+		err := rows.Scan(&mq.ID, &mq.Name, &mq.Content, &mq.SourceLanguage, &mq.TargetLanguage)
+		if err != nil {
+			logger.Error("failed to scan movie from queue: %w", err)
+		}
+		movies = append(movies, mq)
+	}
+
+	if err = rows.Err(); err != nil {
+		logger.Error("failed to get movies from queue: %w", err)
+	}
+
+	for _, mq := range movies {
+
+		m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, map[string]string{
+			mq.SourceLanguage: langMap[mq.SourceLanguage],
+			mq.TargetLanguage: langMap[mq.TargetLanguage],
+		})
+		if err != nil {
+			logger.Error("failed to create movie from queue id: %d: %w", mq.ID, err)
+		} else {
+			_, err = db.Exec("UPDATE movies_queue SET movie_id = ?, status = ? WHERE id = ?", m.ID, MovieQueueStatusMovieCreated, mq.ID)
+			if err != nil {
+				logger.Error("failed to update status of movie queue id: %d: %w", mq.ID, err)
+			} else {
+				logger.Info("movie created from queue id: %d", mq.ID)
+				mq.Status = MovieQueueStatusMovieCreated
+				runtime.EventsEmit(ctx, "movie-created", mq)
+			}
+		}
+	}
+}
+
+func CreateSubtitleFromQueue(ctx context.Context) {
+	db := database.GetDB()
+
+	logger, err := logger.GetLogger()
+	if err != nil {
+		logger.Error("failed to get logger: %w", err)
+	}
+
+	s := NewSubtitle()
+
+	rows, err := db.Query(`
+		SELECT mq.id as mid, mq.movie_id, mq.name, mq.content, mq.source_language, mq.target_language, mq.status, 
+		  mq.created_at as mq_created_at, mq.processed_at as mq_processed_at,
+		  m.id, m.title, m.default_language, m.languages, m.created_at, m.updated_at
+		FROM movies_queue mq
+		LEFT JOIN movies m ON mq.movie_id = m.id
+		WHERE mq.movie_id IS NOT NULL
+		AND mq.movie_id != 0
+		AND mq.status = ?
+	`, MovieQueueStatusMovieCreated)
+	if err != nil {
+		logger.Error("failed to get movies from queue: %w", err)
+		return
+	}
+	defer rows.Close()
+
+	type MovieWithContent struct {
+		Movie   Movie
+		MQ      MovieQueue
+		Content string
+	}
+
+	var moviesWithContent []MovieWithContent
+
+	for rows.Next() {
+		var mwc MovieWithContent
+		var processedAt sql.NullTime
+		var jsonLanguages []byte
+		err := rows.Scan(&mwc.MQ.ID, &mwc.MQ.MovieID, &mwc.MQ.Name, &mwc.MQ.Content, &mwc.MQ.SourceLanguage,
+			&mwc.MQ.TargetLanguage, &mwc.MQ.Status, &mwc.MQ.CreatedAt, &processedAt,
+			&mwc.Movie.ID, &mwc.Movie.Title, &mwc.Movie.DefaultLanguage, &jsonLanguages,
+			&mwc.Movie.CreatedAt, &mwc.Movie.UpdatedAt)
+		if err != nil {
+			logger.Error("failed to scan movie from queue: %w", err)
+			continue
+		}
+		err = json.Unmarshal(jsonLanguages, &mwc.Movie.Languages)
+		if err != nil {
+			logger.Error("failed to unmarshal languages: %w", err)
+			continue
+		}
+		if processedAt.Valid {
+			mwc.MQ.ProcessedAt = &processedAt.Time
+		}
+		moviesWithContent = append(moviesWithContent, mwc)
+	}
+
+	if err = rows.Err(); err != nil {
+		logger.Error("failed to get movies from queue: %w", err)
+		return
+	}
+
+	for _, mwc := range moviesWithContent {
+		err = s.ImportFromSRTFile(mwc.Movie, mwc.MQ.Content)
+		if err != nil {
+			logger.Error("failed to create subtitle from queue id: %d: %w", mwc.MQ.ID, err)
+			continue
+		} else {
+			logger.Info("subtitle created from queue %d", mwc.MQ.ID)
+			_, err = db.Exec("UPDATE movies_queue SET status = ? WHERE movie_id = ?", MovieQueueStatusSubtitleCreated, mwc.Movie.ID)
+			if err != nil {
+				logger.Error("failed to update status of movie queue id: %d: %w", mwc.MQ.ID, err)
+			} else {
+				logger.Info("subtitle created from queue id: %d", mwc.MQ.ID)
+				mwc.MQ.Status = MovieQueueStatusSubtitleCreated
+				runtime.EventsEmit(ctx, "subtitle-created", mwc.MQ)
+			}
+		}
+	}
+
 }

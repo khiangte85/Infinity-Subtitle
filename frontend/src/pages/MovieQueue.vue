@@ -1,56 +1,13 @@
 <script setup lang="ts">
   import { ref, onMounted } from 'vue';
   import { useQuasar } from 'quasar';
+  import * as movieQueueAPI from '../../wailsjs/go/backend/MovieQueue';
   import { backend } from '../../wailsjs/go/models';
   import BatchUpload from '../components/movie-queue/BatchUpload.vue';
-
-  interface AddToQueueRequest {
-    name: string;
-    content: string;
-    source_language: string;
-    target_language: string;
-  }
-
-  interface MovieQueue {
-    id: number;
-    name: string;
-    content: string;
-    source_language: string;
-    target_language: string;
-    status: number;
-    created_at: string;
-    processed_at: string | null;
-  }
-
-  interface MovieQueueResponse {
-    movies: MovieQueue[];
-    pagination: {
-      rowsNumber: number;
-    };
-  }
-
-  interface GetQueueRequest {
-    page: number;
-    rowsPerPage: number;
-    sortBy: string;
-    descending: boolean;
-  }
-
-  declare global {
-    interface Window {
-      backend: {
-        MovieQueue: {
-          AddToQueue: (request: AddToQueueRequest) => Promise<void>;
-          DeleteFromQueue: (id: number) => Promise<void>;
-          GetQueue: (request: GetQueueRequest) => Promise<MovieQueueResponse>;
-        };
-      };
-    }
-  }
-
+  import { EventsOn } from '../../wailsjs/runtime';
   const $q = useQuasar();
   const loading = ref(false);
-  const movies = ref<MovieQueue[]>([]);
+  const movies = ref<backend.MovieQueue[]>([]);
   const showBatchDialog = ref(false);
   const filter = ref({
     title: '',
@@ -101,7 +58,7 @@
     },
   ];
 
-  const pagination = ref({
+  const pagination = ref<backend.Pagination>({
     sortBy: 'created_at',
     descending: true,
     page: 1,
@@ -109,16 +66,36 @@
     rowsNumber: 0,
   });
 
+  EventsOn('subtitle-created', (data: backend.MovieQueue) => {
+    movies.value = movies.value.map((movie) => {
+      if (movie.id === data.id) {
+        return data;
+      }
+      return movie;
+    });
+  });
+
+  EventsOn('movie-created', (data: backend.MovieQueue) => {
+    movies.value = movies.value.map((movie) => {
+      if (movie.id === data.id) {
+        return data;
+      }
+      return movie;
+    });
+  });
+
   const getStatusColor = (status: number) => {
     switch (status) {
       case 0:
-        return 'primary';
+        return 'grey';
       case 1:
-        return 'warning';
+        return 'primary';
       case 2:
-        return 'positive';
+        return 'primary';
       case 3:
-        return 'negative';
+        return 'primary';
+      case 4:
+        return 'primary';
       default:
         return 'grey';
     }
@@ -129,24 +106,29 @@
       case 0:
         return 'Pending';
       case 1:
-        return 'Processing';
+        return 'Movie created';
       case 2:
-        return 'Completed';
+        return 'Subtitle created';
       case 3:
+        return 'Subtitle translated';
+      case 4:
         return 'Failed';
       default:
         return 'Unknown';
     }
   };
 
-  const deleteMovie = async (movie: MovieQueue) => {
+  const deleteMovie = async (movie: backend.MovieQueue) => {
     try {
-      await window.backend.MovieQueue.DeleteFromQueue(movie.id);
+      await movieQueueAPI.DeleteFromQueue(movie.id);
       $q.notify({
         color: 'positive',
         message: 'Movie deleted from queue',
       });
-      loadMovies();
+      onRequest({
+        pagination: pagination.value,
+        filter: filter.value,
+      });
     } catch (error) {
       $q.notify({
         color: 'negative',
@@ -155,34 +137,43 @@
     }
   };
 
-  const loadMovies = async () => {
+  const fetchMovies = async (props: any) => {
     loading.value = true;
     try {
-      const response = await window.backend.MovieQueue.GetQueue({
-        page: pagination.value.page,
-        rowsPerPage: pagination.value.rowsPerPage,
-        sortBy: pagination.value.sortBy,
-        descending: pagination.value.descending,
-      });
-      movies.value = response.movies;
-      pagination.value.rowsNumber = response.pagination.rowsNumber;
+      const response = await movieQueueAPI.ListQueue(
+        filter.value.title,
+        props.pagination
+      );
+      movies.value = response.movies ?? [];
+      return response;
     } catch (error) {
+      console.error('Error fetching movies:', error);
       $q.notify({
         color: 'negative',
         message: 'Failed to load movies queue',
       });
+      return null;
     } finally {
       loading.value = false;
     }
   };
 
-  const onRequest = (props: any) => {
-    pagination.value = props.pagination;
-    loadMovies();
+  const onRequest = async (props: any) => {
+    const { page, rowsPerPage, sortBy, descending } = props.pagination;
+    props.filter = filter.value;
+    const response = await fetchMovies(props);
+    pagination.value.page = page;
+    pagination.value.rowsPerPage = rowsPerPage;
+    pagination.value.rowsNumber = response?.pagination.rowsNumber ?? 0;
+    pagination.value.sortBy = sortBy;
+    pagination.value.descending = descending;
   };
 
   onMounted(() => {
-    loadMovies();
+    onRequest({
+      pagination: pagination.value,
+      filter: filter.value,
+    });
   });
 </script>
 
@@ -213,7 +204,7 @@
     </q-card-section>
   </q-card>
 
-    <q-card
+  <q-card
     flat
     bordered
     class="full-width q-mb-md"
@@ -295,16 +286,25 @@
     </template>
   </q-table>
 
-  <q-dialog        v-model="showBatchDialog" persistent>
+  <q-dialog
+    v-model="showBatchDialog"
+    persistent
+  >
     <BatchUpload
-      @onClose="() => {
-        showBatchDialog = false;
-      }"
-      @on-queue="() => {
-        showBatchDialog = false;
-        loadMovies();
-      }"
+      @onClose="
+        () => {
+          showBatchDialog = false;
+        }
+      "
+      @on-queue="
+        () => {
+          showBatchDialog = false;
+          onRequest({
+            pagination: pagination,
+            filter: filter,
+          });
+        }
+      "
     />
   </q-dialog>
-
 </template>

@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"infinity-subtitle/backend"
 	"infinity-subtitle/backend/database"
 	"infinity-subtitle/backend/logger"
+	"time"
+
 )
 
 // App struct
@@ -26,7 +29,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 
 	// Initialize database
-	err = database.GetDB().Init();
+	err = database.GetDB().Init()
 	if err != nil {
 		logger.Error("Error initializing database:", err.Error())
 	}
@@ -38,4 +41,19 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		logger.Error("Error checking tables:", err.Error())
 	}
+
+	// runtime.EventsOn(a.ctx, "on-queue-added", func(data ...any) {
+	// 	logger.Info("Queue added", data)
+	// })
+
+	// Run CreateMovieFromQueue and CreateSubtitleFromQueue for every 10 secs
+	go func() {
+		for {
+			backend.CreateMovieFromQueue(a.ctx)
+			time.Sleep(2 * time.Second)
+			backend.CreateSubtitleFromQueue(a.ctx)
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
 }

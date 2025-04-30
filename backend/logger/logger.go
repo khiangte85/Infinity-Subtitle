@@ -93,7 +93,7 @@ func (l *Logger) Close() error {
 }
 
 // logWithRotation is a helper function that ensures log rotation is checked before logging
-func (l *Logger) logWithRotation(level string, format string, v ...interface{}) {
+func (l *Logger) logWithRotation(level string, format string, v ...any) {
 	if err := l.checkAndRotate(); err != nil {
 		// If rotation fails, log to stderr
 		log.Printf("ERROR: Failed to rotate log file: %v", err)
@@ -105,21 +105,21 @@ func (l *Logger) logWithRotation(level string, format string, v ...interface{}) 
 }
 
 // Info logs an info message
-func (l *Logger) Info(format string, v ...interface{}) {
+func (l *Logger) Info(format string, v ...any) {
 	l.logWithRotation("INFO", format, v...)
 }
 
 // Error logs an error message
-func (l *Logger) Error(format string, v ...interface{}) {
+func (l *Logger) Error(format string, v ...any) {
 	l.logWithRotation("ERROR", format, v...)
 }
 
 // Debug logs a debug message
-func (l *Logger) Debug(format string, v ...interface{}) {
+func (l *Logger) Debug(format string, v ...any) {
 	l.logWithRotation("DEBUG", format, v...)
 }
 
 // Warn logs a warning message
-func (l *Logger) Warn(format string, v ...interface{}) {
+func (l *Logger) Warn(format string, v ...any) {
 	l.logWithRotation("WARN", format, v...)
 }

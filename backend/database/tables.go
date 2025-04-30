@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"infinity-subtitle/backend/logger"
 	"log"
 )
 
@@ -89,39 +90,90 @@ func createSubtitlesTable(db *sql.DB) error {
 	return nil
 }
 
-func CheckTablesExists() bool {
+func createMoviesQueueTable(db *sql.DB) error {
+	_, err := db.Exec(`
+	CREATE TABLE IF NOT EXISTS movies_queue (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		content LONGTEXT NOT NULL,
+		source_language TEXT NOT NULL,
+		target_language TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		processed_at DATETIME DEFAULT NULL,
+		status SMALLINT NOT NULL DEFAULT 0,
+	)`)
+
+	if err != nil {
+		return fmt.Errorf("error creating movies_queues table: %w", err)
+	}
+
+	return nil
+}
+
+func CheckTablesExists() error {
 	db := GetDB()
+	logger, err := logger.GetLogger()
+	if err != nil {
+		logger.Error("Error getting logger:", err)
+		return err
+	}
 
 	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='languages')").Scan(&exists)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='languages')").Scan(&exists)
 	if err != nil {
-		fmt.Println("[x] Error checking languages table:", err)
-		return false
+		logger.Error("Error checking languages table:", err)
+		return err
 	}
 
 	if !exists {
-		createLanguagesTable(db.DB)
+		err = createLanguagesTable(db.DB)
+		if err != nil {
+			logger.Error("Error creating languages table:", err)
+			return err
+		}
 	}
 
 	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='movies')").Scan(&exists)
 	if err != nil {
-		fmt.Println("[x] Error checking movies table:", err)
-		return false
+		logger.Error("Error checking movies table:", err)
+		return err
 	}
 
 	if !exists {
-		createMoviesTable(db.DB)
+		err = createMoviesTable(db.DB)
+		if err != nil {
+			logger.Error("Error creating movies table:", err)
+			return err
+		}
 	}
 
 	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='subtitles')").Scan(&exists)
 	if err != nil {
-		fmt.Println("[x] Error checking subtitles table:", err)
-		return false
+		logger.Error("Error checking subtitles table:", err)
+		return err
 	}
 
 	if !exists {
-		createSubtitlesTable(db.DB)
+		err = createSubtitlesTable(db.DB)
+		if err != nil {
+			logger.Error("Error creating subtitles table:", err)
+			return err
+		}
 	}
 
-	return true
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='movies_queue')").Scan(&exists)
+	if err != nil {
+		logger.Error("Error checking movies_queue table:", err)
+		return err
+	}
+
+	if !exists {
+		err = createMoviesQueueTable(db.DB)
+		if err != nil {
+			logger.Error("Error creating movies_queue table:", err)
+			return err
+		}
+	}
+
+	return nil
 }

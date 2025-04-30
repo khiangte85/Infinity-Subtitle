@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"infinity-subtitle/backend/database"
+	"infinity-subtitle/backend/logger"
 )
 
 // App struct
@@ -19,16 +20,19 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	logger, err := logger.GetLogger()
+	if err != nil {
+		logger.Error("Error initializing logger:", err.Error())
+	}
 
 	// Initialize database
-	err := database.GetDB().Init();
+	err = database.GetDB().Init();
 	if err != nil {
-		println("Error initializing database:", err.Error())
+		logger.Error("Error initializing database:", err.Error())
 	}
 
-	// Check if tables exist
-	if !database.CheckTablesExists() {
-		database.CreateTables()
-		database.InsertLanguages()
-	}
+	logger.Info("App started")
+
+	// Check if tables exist and create them if they don't
+	database.CheckTablesExists()
 }

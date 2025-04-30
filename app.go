@@ -34,5 +34,8 @@ func (a *App) startup(ctx context.Context) {
 	logger.Info("App started")
 
 	// Check if tables exist and create them if they don't
-	database.CheckTablesExists()
+	err = database.CheckTablesExists()
+	if err != nil {
+		logger.Error("Error checking tables:", err.Error())
+	}
 }

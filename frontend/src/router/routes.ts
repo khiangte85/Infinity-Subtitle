@@ -22,6 +22,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Subtitle.vue'),
   },
   {
+    path: '/movie-queue',
+    name: 'MovieQueue',
+    meta: {
+      title: 'Queues',
+      icon: 'fas fa-layer-group',
+      show: true,
+    },
+    component: () => import('../pages/MovieQueue.vue'),
+  },
+  {
     path: '/languages',
     name: 'Languages',
     meta: {

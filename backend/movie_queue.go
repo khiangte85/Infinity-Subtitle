@@ -223,22 +223,46 @@ func CreateMovieFromQueue(ctx context.Context) {
 
 		for _, mq := range movies {
 
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				logger.Error("failed to begin transaction: %w", err)
+				continue
+			}
+
 			m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, map[string]string{
 				mq.SourceLanguage: langMap[mq.SourceLanguage],
 				mq.TargetLanguage: langMap[mq.TargetLanguage],
 			})
 			if err != nil {
 				logger.Error("failed to create movie from queue id: %d: %w", mq.ID, err)
-			} else {
-				_, err = db.ExecContext(ctx, "UPDATE movies_queue SET movie_id = ?, status = ? WHERE id = ?", m.ID, MovieQueueStatusMovieCreated, mq.ID)
-				if err != nil {
-					logger.Error("failed to update status of movie queue id: %d: %w", mq.ID, err)
-				} else {
-					logger.Info("movie queue id status created: %d", mq.ID)
-					mq.Status = MovieQueueStatusMovieCreated
-					runtime.EventsEmit(ctx, "movie-created", mq)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
+				continue
 			}
+
+			_, err = tx.ExecContext(ctx,
+				"UPDATE movies_queue SET movie_id = ?, status = ? WHERE id = ?",
+				m.ID, MovieQueueStatusMovieCreated, mq.ID)
+			if err != nil {
+				logger.Error("failed to update status of movie queue id: %d: %w", mq.ID, err)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
+				}
+				continue
+			}
+
+			if err = tx.Commit(); err != nil {
+				logger.Error("failed to commit transaction: %w", err)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
+				}
+				continue
+			}
+
+			logger.Info("movie queue id status created: %d", mq.ID)
+			mq.Status = MovieQueueStatusMovieCreated
+			runtime.EventsEmit(ctx, "movie-created", mq)
 		}
 	}
 }
@@ -311,21 +335,43 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 		}
 
 		for _, mwc := range moviesWithContent {
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				logger.Error("failed to begin transaction: %w", err)
+				continue
+			}
+
 			err = s.ImportFromSRTFile(mwc.Movie, mwc.MQ.Content)
 			if err != nil {
 				logger.Error("failed to create subtitle from queue id: %d: %w", mwc.MQ.ID, err)
-				continue
-			} else {
-				logger.Info("subtitle created from queue %d", mwc.MQ.ID)
-				_, err = db.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?", MovieQueueStatusSubtitleCreated, mwc.Movie.ID)
-				if err != nil {
-					logger.Error("failed to update status of movie queue id: %d: %w", mwc.MQ.ID, err)
-				} else {
-					logger.Info("subtitle queue id status created: %d", mwc.MQ.ID)
-					mwc.MQ.Status = MovieQueueStatusSubtitleCreated
-					runtime.EventsEmit(ctx, "subtitle-created", mwc.MQ)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
+				continue
 			}
+
+			logger.Info("subtitle created from queue %d", mwc.MQ.ID)
+			_, err = tx.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
+				MovieQueueStatusSubtitleCreated, mwc.Movie.ID)
+			if err != nil {
+				logger.Error("failed to update status of movie queue id: %d: %w", mwc.MQ.ID, err)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
+				}
+				continue
+			}
+
+			if err = tx.Commit(); err != nil {
+				logger.Error("failed to commit transaction: %w", err)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
+				}
+				continue
+			}
+
+			logger.Info("subtitle queue id status created: %d", mwc.MQ.ID)
+			mwc.MQ.Status = MovieQueueStatusSubtitleCreated
+			runtime.EventsEmit(ctx, "subtitle-created", mwc.MQ)
 		}
 	}
 

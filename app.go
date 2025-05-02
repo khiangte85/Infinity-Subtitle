@@ -6,6 +6,7 @@ import (
 	"infinity-subtitle/backend/database"
 	"infinity-subtitle/backend/logger"
 	"sync"
+	"time"
 )
 
 // App struct
@@ -15,7 +16,6 @@ type App struct {
 	cancelFunc context.CancelFunc
 	logger     *logger.Logger
 }
-
 
 // NewApp creates a new App application struct
 func NewApp() *App {
@@ -58,7 +58,9 @@ func (a *App) startup(ctx context.Context) {
 				return
 			default:
 				a.createMovieFromQueue()
+				time.Sleep(1 * time.Second)
 				a.createSubtitleFromQueue()
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
@@ -103,5 +105,5 @@ func (a *App) shutdown(ctx context.Context) {
 	case <-ctx.Done():
 		a.logger.Info("Shutdown timed out, forcing shutdown")
 	}
-	
+
 }

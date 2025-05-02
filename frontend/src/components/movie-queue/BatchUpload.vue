@@ -11,7 +11,7 @@
     file: File;
     name: string;
     sourceLanguage: string;
-    targetLanguage: string;
+    targetLanguages: string[];
   }
 
   const emit = defineEmits<{
@@ -35,15 +35,21 @@
       return false;
     }
 
-    return (
-      selectedFiles.value.every(
-        (file) =>
-          file.name &&
-          file.sourceLanguage &&
-          file.targetLanguage &&
-          file.sourceLanguage !== file.targetLanguage
-      ) && Object.keys(errors.value).length === 0
-    );
+    // Check each file's validation
+    const allFilesValid = selectedFiles.value.map((file) => {
+      if (!file.name || !file.sourceLanguage || file.targetLanguages.length === 0) {
+        return false;
+      }
+
+      let targetLanguages = file.targetLanguages.filter((tgt) => tgt !== file.sourceLanguage);
+      if (targetLanguages.length === 0) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return allFilesValid.every((valid) => valid) && Object.keys(errors.value).length === 0;
   });
 
   const onFilesSelected = () => {
@@ -52,12 +58,27 @@
       return;
     }
 
-    selectedFiles.value = files.value.map((file) => ({
-      file,
-      name: file.name.replace('.srt', ''),
-      sourceLanguage: '',
-      targetLanguage: '',
-    }));
+    // Create a map of existing files and their selections
+    const existingSelections = new Map(
+      selectedFiles.value
+        .filter(existingFile => 
+          files.value.some(newFile => newFile.name === existingFile.file.name)
+        )
+        .map(file => [file.file.name, {
+          sourceLanguage: file.sourceLanguage,
+          targetLanguages: file.targetLanguages
+        }])
+    );
+
+    selectedFiles.value = files.value.map((file) => {
+      const existingSelection = existingSelections.get(file.name);
+      return {
+        file,
+        name: file.name.replace('.srt', ''),
+        sourceLanguage: existingSelection?.sourceLanguage || '',
+        targetLanguages: existingSelection?.targetLanguages || [],
+      };
+    });
   };
 
   const validateSourceLanguage = (src: string) => {
@@ -65,27 +86,27 @@
       (file) => file.sourceLanguage === src
     );
     if (index !== -1) {
-      const tgt = selectedFiles.value[index].targetLanguage;
-      if (src && tgt && src === tgt) {
+      const targetLangs = selectedFiles.value[index].targetLanguages;
+      if (src && targetLangs.includes(src)) {
         selectedFiles.value[index].sourceLanguage = '';
         errors.value[`source_${index}`] =
-          'Source and target languages cannot be the same';
+          'Source language cannot be in target languages';
       } else {
         delete errors.value[`source_${index}`];
       }
     }
   };
 
-  const validateTargetLanguage = (tgt: string) => {
+  const validateTargetLanguages = (tgt: string[]) => {
     const index = selectedFiles.value.findIndex(
-      (file) => file.targetLanguage === tgt
+      (file) => file.targetLanguages === tgt
     );
     if (index !== -1) {
       const src = selectedFiles.value[index].sourceLanguage;
-      if (src && tgt && src === tgt) {
-        selectedFiles.value[index].targetLanguage = '';
+      if (src && tgt.includes(src)) {
+        selectedFiles.value[index].targetLanguages = [];
         errors.value[`target_${index}`] =
-          'Source and target languages cannot be the same';
+          'Target languages cannot include source language';
       } else {
         delete errors.value[`target_${index}`];
       }
@@ -117,7 +138,7 @@
           name: file.name,
           content: await file.file.text(),
           source_language: file.sourceLanguage,
-          target_language: file.targetLanguage,
+          target_language: file.targetLanguages.join(','),
         }))
       );
 
@@ -229,15 +250,17 @@
               <q-select
                 dense
                 outlined
-                v-model="file.targetLanguage"
+                v-model="file.targetLanguages"
                 :options="languages"
                 option-value="code"
                 option-label="name"
                 emit-value
                 map-options
-                label="Target Language"
-                :rules="[(val) => !!val || 'Target language is required']"
-                @update:model-value="validateTargetLanguage"
+                use-chips
+                multiple
+                label="Target Languages"
+                :rules="[(val) => val.length > 0 || 'At least one target language is required']"
+                @update:model-value="validateTargetLanguages"
               />
             </div>
           </div>

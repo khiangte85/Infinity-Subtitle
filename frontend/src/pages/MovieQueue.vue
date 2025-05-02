@@ -17,34 +17,46 @@
 
   const columns = [
     {
+      name: 'id',
+      label: '#',
+      field: 'id',
+      align: 'left' as const,
+      sortable: true,
+    },
+    {
       name: 'name',
       label: 'Name',
       field: 'name',
       align: 'left' as const,
+      sortable: true,
     },
     {
       name: 'source_language',
       label: 'Source Language',
       field: 'source_language',
       align: 'left' as const,
+      sortable: true,
     },
     {
       name: 'target_language',
       label: 'Target Language',
       field: 'target_language',
       align: 'left' as const,
+      sortable: true,
     },
     {
       name: 'status',
       label: 'Status',
       field: 'status',
       align: 'left' as const,
+      sortable: true,
     },
     {
       name: 'created_at',
       label: 'Created At',
       field: 'created_at',
       align: 'left' as const,
+      sortable: true,
       format: (val: string) => {
         return new Date(val)
           .toLocaleDateString('en-US', {

@@ -98,7 +98,7 @@ func createMoviesQueueTable(db *sql.DB) error {
 		name TEXT NOT NULL,
 		content LONGTEXT NOT NULL,
 		source_language TEXT NOT NULL,
-		target_language TEXT NOT NULL,
+		target_languages JSON NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		processed_at DATETIME DEFAULT NULL,
 		status SMALLINT NOT NULL DEFAULT 0

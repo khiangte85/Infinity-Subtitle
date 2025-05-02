@@ -170,84 +170,95 @@ func (mq *MovieQueue) DeleteFromQueue(id int) error {
 }
 
 func CreateMovieFromQueue(ctx context.Context) {
-	db := database.GetDB()
-
 	logger, err := logger.GetLogger()
 	if err != nil {
 		logger.Error("failed to get logger: %w", err)
 	}
 
-	lang := NewLanguage()
-	langs, err := lang.GetAllLanguages()
-	if err != nil {
-		logger.Error("failed to get languages: %w", err)
-	}
+	select {
+	case <-ctx.Done():
+		logger.Info("Context cancelled, exiting CreateMovieFromQueue")
+		return
+	default:
+		db := database.GetDB()
 
-	langMap := make(map[string]string)
-	for _, lang := range langs {
-		langMap[lang.Code] = lang.Name
-	}
+		lang := NewLanguage()
+		langs, err := lang.GetAllLanguages()
+		if err != nil {
+			logger.Error("failed to get languages: %w", err)
+		}
 
-	m := NewMovie()
+		langMap := make(map[string]string)
+		for _, lang := range langs {
+			langMap[lang.Code] = lang.Name
+		}
 
-	rows, err := db.Query(`
+		m := NewMovie()
+
+		rows, err := db.QueryContext(ctx, `
 		SELECT id, name, content, source_language, target_language 
 		FROM movies_queue 
 		WHERE movie_id IS NULL
 		AND status = ?
 	`, MovieQueueStatusPending)
-	if err != nil {
-		logger.Error("failed to get movies from queue: %w", err)
-	}
-	defer rows.Close()
-
-	var movies []MovieQueue
-
-	for rows.Next() {
-		var mq MovieQueue
-		err := rows.Scan(&mq.ID, &mq.Name, &mq.Content, &mq.SourceLanguage, &mq.TargetLanguage)
 		if err != nil {
-			logger.Error("failed to scan movie from queue: %w", err)
+			logger.Error("failed to get movies from queue: %w", err)
 		}
-		movies = append(movies, mq)
-	}
+		defer rows.Close()
 
-	if err = rows.Err(); err != nil {
-		logger.Error("failed to get movies from queue: %w", err)
-	}
+		var movies []MovieQueue
 
-	for _, mq := range movies {
-
-		m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, map[string]string{
-			mq.SourceLanguage: langMap[mq.SourceLanguage],
-			mq.TargetLanguage: langMap[mq.TargetLanguage],
-		})
-		if err != nil {
-			logger.Error("failed to create movie from queue id: %d: %w", mq.ID, err)
-		} else {
-			_, err = db.Exec("UPDATE movies_queue SET movie_id = ?, status = ? WHERE id = ?", m.ID, MovieQueueStatusMovieCreated, mq.ID)
+		for rows.Next() {
+			var mq MovieQueue
+			err := rows.Scan(&mq.ID, &mq.Name, &mq.Content, &mq.SourceLanguage, &mq.TargetLanguage)
 			if err != nil {
-				logger.Error("failed to update status of movie queue id: %d: %w", mq.ID, err)
+				logger.Error("failed to scan movie from queue: %w", err)
+			}
+			movies = append(movies, mq)
+		}
+
+		if err = rows.Err(); err != nil {
+			logger.Error("failed to get movies from queue: %w", err)
+		}
+
+		for _, mq := range movies {
+
+			m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, map[string]string{
+				mq.SourceLanguage: langMap[mq.SourceLanguage],
+				mq.TargetLanguage: langMap[mq.TargetLanguage],
+			})
+			if err != nil {
+				logger.Error("failed to create movie from queue id: %d: %w", mq.ID, err)
 			} else {
-				logger.Info("movie created from queue id: %d", mq.ID)
-				mq.Status = MovieQueueStatusMovieCreated
-				runtime.EventsEmit(ctx, "movie-created", mq)
+				_, err = db.ExecContext(ctx, "UPDATE movies_queue SET movie_id = ?, status = ? WHERE id = ?", m.ID, MovieQueueStatusMovieCreated, mq.ID)
+				if err != nil {
+					logger.Error("failed to update status of movie queue id: %d: %w", mq.ID, err)
+				} else {
+					logger.Info("movie queue id status created: %d", mq.ID)
+					mq.Status = MovieQueueStatusMovieCreated
+					runtime.EventsEmit(ctx, "movie-created", mq)
+				}
 			}
 		}
 	}
 }
 
 func CreateSubtitleFromQueue(ctx context.Context) {
-	db := database.GetDB()
-
 	logger, err := logger.GetLogger()
 	if err != nil {
 		logger.Error("failed to get logger: %w", err)
 	}
 
-	s := NewSubtitle()
+	select {
+	case <-ctx.Done():
+		logger.Info("Context cancelled, exiting CreateSubtitleFromQueue")
+		return
+	default:
+		db := database.GetDB()
 
-	rows, err := db.Query(`
+		s := NewSubtitle()
+
+		rows, err := db.QueryContext(ctx, `
 		SELECT mq.id as mid, mq.movie_id, mq.name, mq.content, mq.source_language, mq.target_language, mq.status, 
 		  mq.created_at as mq_created_at, mq.processed_at as mq_processed_at,
 		  m.id, m.title, m.default_language, m.languages, m.created_at, m.updated_at
@@ -257,62 +268,63 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 		AND mq.movie_id != 0
 		AND mq.status = ?
 	`, MovieQueueStatusMovieCreated)
-	if err != nil {
-		logger.Error("failed to get movies from queue: %w", err)
-		return
-	}
-	defer rows.Close()
-
-	type MovieWithContent struct {
-		Movie   Movie
-		MQ      MovieQueue
-		Content string
-	}
-
-	var moviesWithContent []MovieWithContent
-
-	for rows.Next() {
-		var mwc MovieWithContent
-		var processedAt sql.NullTime
-		var jsonLanguages []byte
-		err := rows.Scan(&mwc.MQ.ID, &mwc.MQ.MovieID, &mwc.MQ.Name, &mwc.MQ.Content, &mwc.MQ.SourceLanguage,
-			&mwc.MQ.TargetLanguage, &mwc.MQ.Status, &mwc.MQ.CreatedAt, &processedAt,
-			&mwc.Movie.ID, &mwc.Movie.Title, &mwc.Movie.DefaultLanguage, &jsonLanguages,
-			&mwc.Movie.CreatedAt, &mwc.Movie.UpdatedAt)
 		if err != nil {
-			logger.Error("failed to scan movie from queue: %w", err)
-			continue
+			logger.Error("failed to get movies from queue: %w", err)
+			return
 		}
-		err = json.Unmarshal(jsonLanguages, &mwc.Movie.Languages)
-		if err != nil {
-			logger.Error("failed to unmarshal languages: %w", err)
-			continue
-		}
-		if processedAt.Valid {
-			mwc.MQ.ProcessedAt = &processedAt.Time
-		}
-		moviesWithContent = append(moviesWithContent, mwc)
-	}
+		defer rows.Close()
 
-	if err = rows.Err(); err != nil {
-		logger.Error("failed to get movies from queue: %w", err)
-		return
-	}
+		type MovieWithContent struct {
+			Movie   Movie
+			MQ      MovieQueue
+			Content string
+		}
 
-	for _, mwc := range moviesWithContent {
-		err = s.ImportFromSRTFile(mwc.Movie, mwc.MQ.Content)
-		if err != nil {
-			logger.Error("failed to create subtitle from queue id: %d: %w", mwc.MQ.ID, err)
-			continue
-		} else {
-			logger.Info("subtitle created from queue %d", mwc.MQ.ID)
-			_, err = db.Exec("UPDATE movies_queue SET status = ? WHERE movie_id = ?", MovieQueueStatusSubtitleCreated, mwc.Movie.ID)
+		var moviesWithContent []MovieWithContent
+
+		for rows.Next() {
+			var mwc MovieWithContent
+			var processedAt sql.NullTime
+			var jsonLanguages []byte
+			err := rows.Scan(&mwc.MQ.ID, &mwc.MQ.MovieID, &mwc.MQ.Name, &mwc.MQ.Content, &mwc.MQ.SourceLanguage,
+				&mwc.MQ.TargetLanguage, &mwc.MQ.Status, &mwc.MQ.CreatedAt, &processedAt,
+				&mwc.Movie.ID, &mwc.Movie.Title, &mwc.Movie.DefaultLanguage, &jsonLanguages,
+				&mwc.Movie.CreatedAt, &mwc.Movie.UpdatedAt)
 			if err != nil {
-				logger.Error("failed to update status of movie queue id: %d: %w", mwc.MQ.ID, err)
+				logger.Error("failed to scan movie from queue: %w", err)
+				continue
+			}
+			err = json.Unmarshal(jsonLanguages, &mwc.Movie.Languages)
+			if err != nil {
+				logger.Error("failed to unmarshal languages: %w", err)
+				continue
+			}
+			if processedAt.Valid {
+				mwc.MQ.ProcessedAt = &processedAt.Time
+			}
+			moviesWithContent = append(moviesWithContent, mwc)
+		}
+
+		if err = rows.Err(); err != nil {
+			logger.Error("failed to get movies from queue: %w", err)
+			return
+		}
+
+		for _, mwc := range moviesWithContent {
+			err = s.ImportFromSRTFile(mwc.Movie, mwc.MQ.Content)
+			if err != nil {
+				logger.Error("failed to create subtitle from queue id: %d: %w", mwc.MQ.ID, err)
+				continue
 			} else {
-				logger.Info("subtitle created from queue id: %d", mwc.MQ.ID)
-				mwc.MQ.Status = MovieQueueStatusSubtitleCreated
-				runtime.EventsEmit(ctx, "subtitle-created", mwc.MQ)
+				logger.Info("subtitle created from queue %d", mwc.MQ.ID)
+				_, err = db.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?", MovieQueueStatusSubtitleCreated, mwc.Movie.ID)
+				if err != nil {
+					logger.Error("failed to update status of movie queue id: %d: %w", mwc.MQ.ID, err)
+				} else {
+					logger.Info("subtitle queue id status created: %d", mwc.MQ.ID)
+					mwc.MQ.Status = MovieQueueStatusSubtitleCreated
+					runtime.EventsEmit(ctx, "subtitle-created", mwc.MQ)
+				}
 			}
 		}
 	}

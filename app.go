@@ -5,55 +5,103 @@ import (
 	"infinity-subtitle/backend"
 	"infinity-subtitle/backend/database"
 	"infinity-subtitle/backend/logger"
-	"time"
-
+	"sync"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx        context.Context
+	wg         sync.WaitGroup
+	cancelFunc context.CancelFunc
+	logger     *logger.Logger
 }
+
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	logger, err := logger.GetLogger()
+	if err != nil {
+		// If logger creation failed, we can only print to stderr since logger isn't available
+		println("Failed to initialize logger:", err.Error())
+	}
+	return &App{logger: logger}
 }
 
 // startup is called when the app starts. The context is saved
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
-	logger, err := logger.GetLogger()
-	if err != nil {
-		logger.Error("Error initializing logger:", err.Error())
-	}
+	a.ctx, a.cancelFunc = context.WithCancel(ctx)
 
 	// Initialize database
-	err = database.GetDB().Init()
+	err := database.GetDB().Init()
 	if err != nil {
-		logger.Error("Error initializing database:", err.Error())
+		a.logger.Error("Error initializing database:", err.Error())
 	}
 
-	logger.Info("App started")
+	a.logger.Info("App started")
 
 	// Check if tables exist and create them if they don't
 	err = database.CheckTablesExists()
 	if err != nil {
-		logger.Error("Error checking tables:", err.Error())
+		a.logger.Error("Error checking tables:", err.Error())
 	}
 
-	// runtime.EventsOn(a.ctx, "on-queue-added", func(data ...any) {
-	// 	logger.Info("Queue added", data)
-	// })
+	// Run CreateMovieFromQueue and CreateSubtitleFromQueue
 
-	// Run CreateMovieFromQueue and CreateSubtitleFromQueue for every 10 secs
+	a.wg.Add(1)
 	go func() {
+		defer a.wg.Done()
 		for {
-			backend.CreateMovieFromQueue(a.ctx)
-			time.Sleep(2 * time.Second)
-			backend.CreateSubtitleFromQueue(a.ctx)
-			time.Sleep(10 * time.Second)
+			select {
+			case <-a.ctx.Done():
+				a.logger.Info("Context cancelled, exiting goroutine")
+				return
+			default:
+				a.createMovieFromQueue()
+				a.createSubtitleFromQueue()
+			}
 		}
 	}()
 
+}
+
+func (a *App) createMovieFromQueue() {
+	select {
+	case <-a.ctx.Done():
+		a.logger.Info("Context cancelled, exiting goroutine")
+		return
+	default:
+		backend.CreateMovieFromQueue(a.ctx)
+	}
+}
+
+func (a *App) createSubtitleFromQueue() {
+	select {
+	case <-a.ctx.Done():
+		a.logger.Info("Context cancelled, exiting goroutine")
+		return
+	default:
+		backend.CreateSubtitleFromQueue(a.ctx)
+	}
+}
+
+func (a *App) shutdown(ctx context.Context) {
+	a.logger.Info("Shutting down app")
+
+	a.cancelFunc()
+
+	done := make(chan struct{})
+
+	go func() {
+		a.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		a.logger.Info("All goroutines finished")
+	case <-ctx.Done():
+		a.logger.Info("Shutdown timed out, forcing shutdown")
+	}
+	
 }

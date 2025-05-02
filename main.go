@@ -32,6 +32,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 173, G: 216, B: 230, A: 1},
 		OnStartup:        app.startup,
+		OnShutdown:       app.shutdown,
 		Bind: []any{
 			app,
 			language,

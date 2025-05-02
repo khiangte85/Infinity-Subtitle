@@ -189,7 +189,7 @@ func (mq *MovieQueue) AddToQueue(req []AddToQueueRequest) error {
 func (mq *MovieQueue) DeleteFromQueue(id int) error {
 	db := database.GetDB()
 
-	_, err := db.Exec("DELETE FROM movies_queue WHERE id = ? AND status = 0", id)
+	_, err := db.Exec("DELETE FROM movies_queue WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete movie from queue: %w", err)
 	}

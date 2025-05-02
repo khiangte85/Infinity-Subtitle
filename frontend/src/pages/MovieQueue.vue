@@ -160,9 +160,9 @@
     }
   };
 
-  const deleteMovie = async (movie: backend.MovieQueue) => {
+  const deleteMovie = async (id: number) => {
     try {
-      await movieQueueAPI.DeleteFromQueue(movie.id);
+      await movieQueueAPI.DeleteFromQueue(id);
       $q.notify({
         color: 'positive',
         message: 'Movie deleted from queue',
@@ -352,8 +352,8 @@
           round
           color="primary"
           icon="delete"
-          @click="deleteMovie(props.row)"
-          :disable="props.row.status !== 0"
+          @click="deleteMovie(props.row.id)"
+          :disable="![0, 4, 5].includes(props.row.status)"
         />
       </q-td>
     </template>

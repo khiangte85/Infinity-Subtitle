@@ -2,11 +2,13 @@
   import { ref, onMounted } from 'vue';
   import { useQuasar } from 'quasar';
   import * as movieQueueAPI from '../../wailsjs/go/backend/MovieQueue';
+  import * as languageAPI from '../../wailsjs/go/backend/Language';
   import { backend } from '../../wailsjs/go/models';
   import BatchUpload from '../components/movie-queue/BatchUpload.vue';
   import { EventsOn } from '../../wailsjs/runtime';
   const $q = useQuasar();
   const loading = ref(false);
+  const languagesCodeMap = ref<Record<string, string>>({});
   const movies = ref<backend.MovieQueue[]>([]);
   const showBatchDialog = ref(false);
   const filter = ref({
@@ -43,12 +45,18 @@
       label: 'Created At',
       field: 'created_at',
       align: 'left' as const,
-    },
-    {
-      name: 'processed_at',
-      label: 'Processed At',
-      field: 'processed_at',
-      align: 'left' as const,
+      format: (val: string) => {
+        return new Date(val)
+          .toLocaleDateString('en-US', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          })
+          .replace(/\//g, '-');
+      },
     },
     {
       name: 'actions',
@@ -158,6 +166,18 @@
     }
   };
 
+  const getLanguages = async () => {
+    try {
+      const response = await languageAPI.GetAllLanguages();
+      response.forEach((language) => {
+        languagesCodeMap.value[language.code] = language.name;
+      });
+    } catch (error) {
+      console.error('Error fetching languages:', error);
+      return [];
+    }
+  };
+
   const onRequest = async (props: any) => {
     const { page, rowsPerPage, sortBy, descending } = props.pagination;
     props.filter = filter.value;
@@ -169,7 +189,9 @@
     pagination.value.descending = descending;
   };
 
-  onMounted(() => {
+  getLanguages();
+
+  onMounted(async () => {
     onRequest({
       pagination: pagination.value,
       filter: filter.value,
@@ -269,6 +291,18 @@
         >
           {{ getStatusText(props.row.status) }}
         </q-chip>
+      </q-td>
+    </template>
+
+    <template v-slot:body-cell-source_language="props">
+      <q-td :props="props">
+        {{ languagesCodeMap[props.row.source_language] }}
+      </q-td>
+    </template>
+
+    <template v-slot:body-cell-target_language="props">
+      <q-td :props="props">
+        {{ languagesCodeMap[props.row.target_language] }}
       </q-td>
     </template>
 

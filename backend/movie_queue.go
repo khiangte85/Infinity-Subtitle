@@ -240,6 +240,7 @@ func CreateMovieFromQueue(ctx context.Context) {
 				}
 				continue
 			}
+			logger.Info("movie created from queue id: %d", mq.ID)
 
 			_, err = tx.ExecContext(ctx,
 				"UPDATE movies_queue SET movie_id = ?, status = ? WHERE id = ?",

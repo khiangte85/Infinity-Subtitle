@@ -59,11 +59,9 @@ func (a *App) startup(ctx context.Context) {
 				return
 			default:
 				a.createMovieFromQueue()
-				time.Sleep(1 * time.Second)
 				a.createSubtitleFromQueue()
-				time.Sleep(1 * time.Second)
 				a.translateSubtitleFromQueue()
-				time.Sleep(1 * time.Second)
+
 			}
 		}
 	}()

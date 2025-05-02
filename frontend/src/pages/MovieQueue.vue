@@ -86,6 +86,15 @@
     rowsNumber: 0,
   });
 
+  EventsOn('movie-created', (data: backend.MovieQueue) => {
+    movies.value = movies.value.map((movie) => {
+      if (movie.id === data.id) {
+        return data;
+      }
+      return movie;
+    });
+  });
+
   EventsOn('subtitle-created', (data: backend.MovieQueue) => {
     movies.value = movies.value.map((movie) => {
       if (movie.id === data.id) {
@@ -95,10 +104,19 @@
     });
   });
 
-  EventsOn('movie-created', (data: backend.MovieQueue) => {
+  EventsOn('subtitle-translating', (id: number, status: number) => {
     movies.value = movies.value.map((movie) => {
-      if (movie.id === data.id) {
-        return data;
+      if (movie.id === id) {
+        movie.status = status;
+      }
+      return movie;
+    });
+  });
+
+  EventsOn('subtitle-translated', (id: number, status: number) => {
+    movies.value = movies.value.map((movie) => {
+      if (movie.id === id) {
+        movie.status = status;
       }
       return movie;
     });
@@ -113,9 +131,11 @@
       case 2:
         return 'primary';
       case 3:
-        return 'primary';
+        return 'grey';
       case 4:
-        return 'primary';
+        return 'green';
+      case 5:
+        return 'negative';
       default:
         return 'grey';
     }
@@ -130,8 +150,10 @@
       case 2:
         return 'Subtitle created';
       case 3:
-        return 'Subtitle translated';
+        return 'Subtitle translating';
       case 4:
+        return 'Subtitle translated';
+      case 5:
         return 'Failed';
       default:
         return 'Unknown';

@@ -263,6 +263,8 @@ func CreateMovieFromQueue(ctx context.Context) {
 				continue
 			}
 
+			mq.TargetLanguages[mq.SourceLanguage] = langMap[mq.SourceLanguage]
+
 			m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, mq.TargetLanguages)
 			if err != nil {
 				logger.Error("failed to create movie from queue id: %d: %w", mq.ID, err)
@@ -413,4 +415,107 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 		}
 	}
 
+}
+
+func TranslateSubtitleFromQueue(ctx context.Context) {
+	logger, err := logger.GetLogger()
+	if err != nil {
+		logger.Error("failed to get logger: %w", err)
+	}
+
+	select {
+	case <-ctx.Done():
+		logger.Info("Context cancelled, exiting TranslateSubtitleFromQueue")
+		return
+	default:
+		db := database.GetDB()
+
+		rows, err := db.QueryContext(ctx, `
+		SELECT movie_id, source_language, target_languages
+		FROM movies_queue
+		WHERE
+		 status = ?
+		AND movie_id IS NOT NULL
+		AND movie_id != 0
+		`, MovieQueueStatusSubtitleCreated)
+		if err != nil {
+			logger.Error("failed to get movies from queue: %w", err)
+			return
+		}
+		defer rows.Close()
+
+		var movies []Movie
+		for rows.Next() {
+			var movie Movie
+			var targetLanguagesJSON []byte
+			err := rows.Scan(&movie.ID, &movie.DefaultLanguage, &targetLanguagesJSON)
+			if err != nil {
+				logger.Error("failed to scan movie id: %w", err)
+				continue
+			}
+			err = json.Unmarshal(targetLanguagesJSON, &movie.Languages)
+			if err != nil {
+				logger.Error("failed to unmarshal target languages: %w", err)
+				continue
+			}
+			movies = append(movies, movie)
+		}
+
+		if err = rows.Err(); err != nil {
+			logger.Error("failed to get movies from queue: %w", err)
+			return
+		}
+
+		s := NewSubtitle()
+
+		for _, movie := range movies {
+			_, err = db.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
+				MovieQueueStatusTranslating, movie.ID)
+			if err != nil {
+				logger.Error("failed to update status of movie queue id: %d: %w", movie.ID, err)
+				continue
+			}
+			logger.Info("subtitle translating: %d", movie.ID)
+			runtime.EventsEmit(ctx, "subtitle-translating", movie.ID, MovieQueueStatusTranslating)
+
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				logger.Error("failed to begin transaction: %w", err)
+				continue
+			}
+
+			for code := range movie.Languages {
+				if code == movie.DefaultLanguage {
+					continue
+				}
+
+				err = s.TranslateSubtitles(movie.ID, movie.DefaultLanguage, code)
+				if err != nil {
+					logger.Error("failed to translate subtitles: %w", err)
+					continue
+				}
+			}
+
+			_, err = tx.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
+				MovieQueueStatusSubtitleTranslated, movie.ID)
+			if err != nil {
+				logger.Error("failed to update status of movie queue id: %d: %w", movie.ID, err)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
+				}
+			}
+
+			if err = tx.Commit(); err != nil {
+				logger.Error("failed to commit transaction: %w", err)
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
+				}
+				continue
+			}
+
+			logger.Info("subtitle queue id status translated: %d", movie.ID)
+			runtime.EventsEmit(ctx, "subtitle-translated", movie.ID, MovieQueueStatusSubtitleTranslated)
+		}
+
+	}
 }

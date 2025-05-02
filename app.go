@@ -62,6 +62,8 @@ func (a *App) startup(ctx context.Context) {
 				time.Sleep(1 * time.Second)
 				a.createSubtitleFromQueue()
 				time.Sleep(1 * time.Second)
+				a.translateSubtitleFromQueue()
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
@@ -85,6 +87,16 @@ func (a *App) createSubtitleFromQueue() {
 		return
 	default:
 		backend.CreateSubtitleFromQueue(a.ctx)
+	}
+}
+
+func (a *App) translateSubtitleFromQueue() {
+	select {
+	case <-a.ctx.Done():
+		a.logger.Info("Context cancelled, exiting goroutine")
+		return
+	default:
+		backend.TranslateSubtitleFromQueue(a.ctx)
 	}
 }
 

@@ -55,16 +55,48 @@ func (a *App) startup(ctx context.Context) {
 		for {
 			select {
 			case <-a.ctx.Done():
-				a.logger.Info("Context cancelled, exiting goroutine")
+				a.logger.Info("Context cancelled, exiting createMovieFromQueue goroutine")
 				return
 			default:
 				a.createMovieFromQueue()
-				a.createSubtitleFromQueue()
-				a.translateSubtitleFromQueue()
-
+				time.Sleep(1 * time.Second) // Prevents high CPU usage
 			}
 		}
 	}()
+
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		for {
+			select {
+			case <-a.ctx.Done():
+				a.logger.Info("Context cancelled, exiting createSubtitleFromQueue goroutine")
+				return
+			default:
+				a.createSubtitleFromQueue()
+				time.Sleep(1 * time.Second) // Prevents high CPU usage
+			}
+		}
+	}()
+
+	// Create 3 workers for translation
+	// for i := 1; i <= 3; i++ {
+	a.wg.Add(1)
+	// workerNum := i
+	go func() {
+		defer a.wg.Done()
+		for {
+			select {
+			case <-a.ctx.Done():
+				a.logger.Info("Context cancelled, exiting translateSubtitleFromQueue worker")
+				return
+			default:
+				a.translateSubtitleFromQueue()
+				time.Sleep(1 * time.Second)
+			}
+		}
+	}()
+	// }
 
 }
 

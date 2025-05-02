@@ -71,8 +71,6 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 	prompt += "\nOutput format should be a JSON string with the same keys as input (DO NOT CHANGE THE KEYS), " +
 		"containing only the translations. Do not include ```json ```."
 
-	ts.logger.Info("Translation prompt: %s", prompt)
-
 	resp, err := ts.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{

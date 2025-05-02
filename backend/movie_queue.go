@@ -469,14 +469,14 @@ func TranslateSubtitleFromQueue(ctx context.Context) {
 		s := NewSubtitle()
 
 		for _, movie := range movies {
-			_, err = db.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
-				MovieQueueStatusTranslating, movie.ID)
-			if err != nil {
-				logger.Error("failed to update status of movie queue id: %d: %w", movie.ID, err)
-				continue
-			}
-			logger.Info("subtitle translating: %d", movie.ID)
-			runtime.EventsEmit(ctx, "subtitle-translating", movie.ID, MovieQueueStatusTranslating)
+			// _, err = db.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
+			// 	MovieQueueStatusTranslating, movie.ID)
+			// if err != nil {
+			// 	logger.Error("failed to update status of movie queue id: %d: %w", movie.ID, err)
+			// 	continue
+			// }
+			// logger.Info("subtitle translating: %d", movie.ID)
+			// runtime.EventsEmit(ctx, "subtitle-translating", movie.ID, MovieQueueStatusTranslating)
 
 			tx, err := db.BeginTx(ctx, nil)
 			if err != nil {

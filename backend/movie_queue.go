@@ -13,15 +13,15 @@ import (
 )
 
 type MovieQueue struct {
-	ID             int           `json:"id"`
-	MovieID        sql.NullInt64 `json:"movie_id"`
-	Name           string        `json:"name"`
-	Content        string        `json:"content"`
-	SourceLanguage string        `json:"source_language"`
-	TargetLanguage string        `json:"target_language"`
-	Status         int           `json:"status"`
-	CreatedAt      time.Time     `json:"created_at"`
-	ProcessedAt    *time.Time    `json:"processed_at"`
+	ID              int               `json:"id"`
+	MovieID         sql.NullInt64     `json:"movie_id"`
+	Name            string            `json:"name"`
+	Content         string            `json:"content"`
+	SourceLanguage  string            `json:"source_language"`
+	TargetLanguages map[string]string `json:"target_languages"`
+	Status          int               `json:"status"`
+	CreatedAt       time.Time         `json:"created_at"`
+	ProcessedAt     *time.Time        `json:"processed_at"`
 }
 
 type MovieQueueResponse struct {
@@ -30,16 +30,17 @@ type MovieQueueResponse struct {
 }
 
 type AddToQueueRequest struct {
-	Name           string `json:"name"`
-	Content        string `json:"content"`
-	SourceLanguage string `json:"source_language"`
-	TargetLanguage string `json:"target_language"`
+	Name            string   `json:"name"`
+	Content         string   `json:"content"`
+	SourceLanguage  string   `json:"source_language"`
+	TargetLanguages []string `json:"target_languages"`
 }
 
 const (
 	MovieQueueStatusPending = iota
 	MovieQueueStatusMovieCreated
 	MovieQueueStatusSubtitleCreated
+	MovieQueueStatusTranslating
 	MovieQueueStatusSubtitleTranslated
 	MovieQueueStatusFailed
 )
@@ -70,7 +71,7 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 
 	offset := (pagination.Page - 1) * pagination.RowsPerPage
 
-	query = "SELECT id, movie_id, name, source_language, target_language, status, created_at, processed_at FROM movies_queue"
+	query = "SELECT id, movie_id, name, source_language, target_languages, status, created_at, processed_at FROM movies_queue"
 	if name != "" {
 		query += " WHERE name LIKE ?"
 		args = append(args, "%"+name+"%")
@@ -99,12 +100,13 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 	for rows.Next() {
 		var movie MovieQueue
 		var processedAt sql.NullTime
+		var targetLanguagesJSON []byte
 		err := rows.Scan(
 			&movie.ID,
 			&movie.MovieID,
 			&movie.Name,
 			&movie.SourceLanguage,
-			&movie.TargetLanguage,
+			&targetLanguagesJSON,
 			&movie.Status,
 			&movie.CreatedAt,
 			&processedAt,
@@ -114,6 +116,10 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 		}
 		if processedAt.Valid {
 			movie.ProcessedAt = &processedAt.Time
+		}
+		err = json.Unmarshal(targetLanguagesJSON, &movie.TargetLanguages)
+		if err != nil {
+			return response, fmt.Errorf("failed to unmarshal target languages: %w", err)
 		}
 
 		movies = append(movies, movie)
@@ -133,10 +139,21 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 
 func (mq *MovieQueue) AddToQueue(req []AddToQueueRequest) error {
 	db := database.GetDB()
-	// bulk insert
+
+	languages := NewLanguage()
+	langs, err := languages.GetAllLanguages()
+	if err != nil {
+		return fmt.Errorf("failed to get languages: %w", err)
+	}
+
+	langMap := make(map[string]string)
+	for _, lang := range langs {
+		langMap[lang.Code] = lang.Name
+	}
+
 	stmt, err := db.Prepare(`
 		INSERT INTO movies_queue (
-			name, content, source_language, target_language, status, created_at
+			name, content, source_language, target_languages, status, created_at
 		) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
 	`)
 	if err != nil {
@@ -145,7 +162,18 @@ func (mq *MovieQueue) AddToQueue(req []AddToQueueRequest) error {
 	defer stmt.Close()
 
 	for _, r := range req {
-		_, err = stmt.Exec(r.Name, r.Content, r.SourceLanguage, r.TargetLanguage)
+		targetLanguages := make(map[string]string)
+		var targetLanguagesJSON []byte
+
+		for _, lang := range r.TargetLanguages {
+			targetLanguages[lang] = langMap[lang]
+		}
+
+		targetLanguagesJSON, err = json.Marshal(targetLanguages)
+		if err != nil {
+			return fmt.Errorf("failed to marshal target languages: %w", err)
+		}
+		_, err = stmt.Exec(r.Name, r.Content, r.SourceLanguage, targetLanguagesJSON)
 		if err != nil {
 			return fmt.Errorf("failed to add movie to queue: %w", err)
 		}
@@ -196,7 +224,7 @@ func CreateMovieFromQueue(ctx context.Context) {
 		m := NewMovie()
 
 		rows, err := db.QueryContext(ctx, `
-		SELECT id, name, content, source_language, target_language 
+		SELECT id, name, content, source_language, target_languages, status
 		FROM movies_queue 
 		WHERE movie_id IS NULL
 		AND status = ?
@@ -210,9 +238,15 @@ func CreateMovieFromQueue(ctx context.Context) {
 
 		for rows.Next() {
 			var mq MovieQueue
-			err := rows.Scan(&mq.ID, &mq.Name, &mq.Content, &mq.SourceLanguage, &mq.TargetLanguage)
+			var targetLanguagesJSON []byte
+			err := rows.Scan(&mq.ID, &mq.Name, &mq.Content, &mq.SourceLanguage, &targetLanguagesJSON, &mq.Status)
 			if err != nil {
 				logger.Error("failed to scan movie from queue: %w", err)
+			}
+			err = json.Unmarshal(targetLanguagesJSON, &mq.TargetLanguages)
+			if err != nil {
+				logger.Error("failed to unmarshal target languages: %w", err)
+				continue
 			}
 			movies = append(movies, mq)
 		}
@@ -229,10 +263,7 @@ func CreateMovieFromQueue(ctx context.Context) {
 				continue
 			}
 
-			m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, map[string]string{
-				mq.SourceLanguage: langMap[mq.SourceLanguage],
-				mq.TargetLanguage: langMap[mq.TargetLanguage],
-			})
+			m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, mq.TargetLanguages)
 			if err != nil {
 				logger.Error("failed to create movie from queue id: %d: %w", mq.ID, err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
@@ -284,7 +315,7 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 		s := NewSubtitle()
 
 		rows, err := db.QueryContext(ctx, `
-		SELECT mq.id as mid, mq.movie_id, mq.name, mq.content, mq.source_language, mq.target_language, mq.status, 
+		SELECT mq.id as mid, mq.movie_id, mq.name, mq.content, mq.source_language, mq.target_languages, mq.status, 
 		  mq.created_at as mq_created_at, mq.processed_at as mq_processed_at,
 		  m.id, m.title, m.default_language, m.languages, m.created_at, m.updated_at
 		FROM movies_queue mq
@@ -310,9 +341,10 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 		for rows.Next() {
 			var mwc MovieWithContent
 			var processedAt sql.NullTime
+			var targetLanguagesJSON []byte
 			var jsonLanguages []byte
 			err := rows.Scan(&mwc.MQ.ID, &mwc.MQ.MovieID, &mwc.MQ.Name, &mwc.MQ.Content, &mwc.MQ.SourceLanguage,
-				&mwc.MQ.TargetLanguage, &mwc.MQ.Status, &mwc.MQ.CreatedAt, &processedAt,
+				&targetLanguagesJSON, &mwc.MQ.Status, &mwc.MQ.CreatedAt, &processedAt,
 				&mwc.Movie.ID, &mwc.Movie.Title, &mwc.Movie.DefaultLanguage, &jsonLanguages,
 				&mwc.Movie.CreatedAt, &mwc.Movie.UpdatedAt)
 			if err != nil {
@@ -322,6 +354,11 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 			err = json.Unmarshal(jsonLanguages, &mwc.Movie.Languages)
 			if err != nil {
 				logger.Error("failed to unmarshal languages: %w", err)
+				continue
+			}
+			err = json.Unmarshal(targetLanguagesJSON, &mwc.MQ.TargetLanguages)
+			if err != nil {
+				logger.Error("failed to unmarshal target languages: %w", err)
 				continue
 			}
 			if processedAt.Valid {

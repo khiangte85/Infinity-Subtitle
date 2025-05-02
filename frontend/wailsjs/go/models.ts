@@ -4,7 +4,7 @@ export namespace backend {
 	    name: string;
 	    content: string;
 	    source_language: string;
-	    target_language: string;
+	    target_languages: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new AddToQueueRequest(source);
@@ -15,7 +15,7 @@ export namespace backend {
 	        this.name = source["name"];
 	        this.content = source["content"];
 	        this.source_language = source["source_language"];
-	        this.target_language = source["target_language"];
+	        this.target_languages = source["target_languages"];
 	    }
 	}
 	export class ExportResponse {
@@ -168,7 +168,7 @@ export namespace backend {
 	    name: string;
 	    content: string;
 	    source_language: string;
-	    target_language: string;
+	    target_languages: Record<string, string>;
 	    status: number;
 	    // Go type: time
 	    created_at: any;
@@ -186,7 +186,7 @@ export namespace backend {
 	        this.name = source["name"];
 	        this.content = source["content"];
 	        this.source_language = source["source_language"];
-	        this.target_language = source["target_language"];
+	        this.target_languages = source["target_languages"];
 	        this.status = source["status"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.processed_at = this.convertValues(source["processed_at"], null);

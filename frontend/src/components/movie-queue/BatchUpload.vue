@@ -37,11 +37,17 @@
 
     // Check each file's validation
     const allFilesValid = selectedFiles.value.map((file) => {
-      if (!file.name || !file.sourceLanguage || file.targetLanguages.length === 0) {
+      if (
+        !file.name ||
+        !file.sourceLanguage ||
+        file.targetLanguages.length === 0
+      ) {
         return false;
       }
 
-      let targetLanguages = file.targetLanguages.filter((tgt) => tgt !== file.sourceLanguage);
+      let targetLanguages = file.targetLanguages.filter(
+        (tgt) => tgt !== file.sourceLanguage
+      );
       if (targetLanguages.length === 0) {
         return false;
       }
@@ -49,7 +55,10 @@
       return true;
     });
 
-    return allFilesValid.every((valid) => valid) && Object.keys(errors.value).length === 0;
+    return (
+      allFilesValid.every((valid) => valid) &&
+      Object.keys(errors.value).length === 0
+    );
   });
 
   const onFilesSelected = () => {
@@ -61,13 +70,16 @@
     // Create a map of existing files and their selections
     const existingSelections = new Map(
       selectedFiles.value
-        .filter(existingFile => 
-          files.value.some(newFile => newFile.name === existingFile.file.name)
+        .filter((existingFile) =>
+          files.value.some((newFile) => newFile.name === existingFile.file.name)
         )
-        .map(file => [file.file.name, {
-          sourceLanguage: file.sourceLanguage,
-          targetLanguages: file.targetLanguages
-        }])
+        .map((file) => [
+          file.file.name,
+          {
+            sourceLanguage: file.sourceLanguage,
+            targetLanguages: file.targetLanguages,
+          },
+        ])
     );
 
     selectedFiles.value = files.value.map((file) => {
@@ -138,7 +150,7 @@
           name: file.name,
           content: await file.file.text(),
           source_language: file.sourceLanguage,
-          target_language: file.targetLanguages.join(','),
+          target_languages: file.targetLanguages,
         }))
       );
 
@@ -259,7 +271,11 @@
                 use-chips
                 multiple
                 label="Target Languages"
-                :rules="[(val) => val.length > 0 || 'At least one target language is required']"
+                :rules="[
+                  (val) =>
+                    val.length > 0 ||
+                    'At least one target language is required',
+                ]"
                 @update:model-value="validateTargetLanguages"
               />
             </div>

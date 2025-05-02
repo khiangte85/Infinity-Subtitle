@@ -34,6 +34,7 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize database
 	err := database.GetDB().Init()
+
 	if err != nil {
 		a.logger.Error("Error initializing database:", err.Error())
 	}

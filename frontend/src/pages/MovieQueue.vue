@@ -38,9 +38,9 @@
       sortable: true,
     },
     {
-      name: 'target_language',
-      label: 'Target Language',
-      field: 'target_language',
+      name: 'target_languages',
+      label: 'Target Languages',
+      field: 'target_languages',
       align: 'left' as const,
       sortable: true,
     },
@@ -298,11 +298,12 @@
     <template v-slot:body-cell-status="props">
       <q-td :props="props">
         <q-chip
+          size="10px"
+          class="q-px-md q-py-md text-weight-bold"
           :color="getStatusColor(props.row.status)"
           text-color="white"
-        >
-          {{ getStatusText(props.row.status) }}
-        </q-chip>
+          :label="getStatusText(props.row.status).toUpperCase()"
+        />
       </q-td>
     </template>
 
@@ -312,9 +313,13 @@
       </q-td>
     </template>
 
-    <template v-slot:body-cell-target_language="props">
+    <template v-slot:body-cell-target_languages="props">
       <q-td :props="props">
-        {{ languagesCodeMap[props.row.target_language] }}
+        {{
+          Object.keys(props.row.target_languages)
+            .map((lang: string) => languagesCodeMap[lang])
+            .join(', ')
+        }}
       </q-td>
     </template>
 

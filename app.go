@@ -47,8 +47,7 @@ func (a *App) startup(ctx context.Context) {
 		a.logger.Error("Error checking tables:", err.Error())
 	}
 
-	// Run CreateMovieFromQueue and CreateSubtitleFromQueue
-
+	// Run CreateMovieFromQueue worker
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
@@ -58,12 +57,13 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting createMovieFromQueue goroutine")
 				return
 			default:
-				a.createMovieFromQueue()
-				time.Sleep(1 * time.Second) // Prevents high CPU usage
+				backend.CreateMovieFromQueue(a.ctx)
+				time.Sleep(2 * time.Second)
 			}
 		}
 	}()
 
+	// Run CreateSubtitleFromQueue worker
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
@@ -73,61 +73,28 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting createSubtitleFromQueue goroutine")
 				return
 			default:
-				a.createSubtitleFromQueue()
-				time.Sleep(1 * time.Second) // Prevents high CPU usage
+				backend.CreateSubtitleFromQueue(a.ctx)
+				time.Sleep(2 * time.Second)
 			}
 		}
 	}()
 
-	// Create 3 workers for translation
-	// for i := 1; i <= 3; i++ {
+	// Run TranslateSubtitleFromQueue workers
 	a.wg.Add(1)
-	// workerNum := i
 	go func() {
 		defer a.wg.Done()
 		for {
 			select {
 			case <-a.ctx.Done():
-				a.logger.Info("Context cancelled, exiting translateSubtitleFromQueue worker")
+				a.logger.Info("Context cancelled, exiting translateSubtitleFromQueue goroutine")
 				return
 			default:
-				a.translateSubtitleFromQueue()
-				time.Sleep(1 * time.Second)
+				backend.TranslateSubtitleFromQueue(a.ctx)
+				time.Sleep(2 * time.Second)
 			}
 		}
 	}()
-	// }
 
-}
-
-func (a *App) createMovieFromQueue() {
-	select {
-	case <-a.ctx.Done():
-		a.logger.Info("Context cancelled, exiting goroutine")
-		return
-	default:
-		backend.CreateMovieFromQueue(a.ctx)
-	}
-}
-
-func (a *App) createSubtitleFromQueue() {
-	select {
-	case <-a.ctx.Done():
-		a.logger.Info("Context cancelled, exiting goroutine")
-		return
-	default:
-		backend.CreateSubtitleFromQueue(a.ctx)
-	}
-}
-
-func (a *App) translateSubtitleFromQueue() {
-	select {
-	case <-a.ctx.Done():
-		a.logger.Info("Context cancelled, exiting goroutine")
-		return
-	default:
-		backend.TranslateSubtitleFromQueue(a.ctx)
-	}
 }
 
 func (a *App) shutdown(ctx context.Context) {

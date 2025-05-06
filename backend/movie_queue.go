@@ -205,7 +205,7 @@ func CreateMovieFromQueue(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		logger.Info("Context cancelled, exiting CreateMovieFromQueue")
+		logger.Info("Context cancelled, exiting CreateMovieFromQueue function")
 		return
 	default:
 		db := database.GetDB()
@@ -309,7 +309,7 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		logger.Info("Context cancelled, exiting CreateSubtitleFromQueue")
+		logger.Info("Context cancelled, exiting CreateSubtitleFromQueue function")
 		return
 	default:
 		db := database.GetDB()
@@ -425,7 +425,7 @@ func TranslateSubtitleFromQueue(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		logger.Info("Context cancelled, exiting TranslateSubtitleFromQueue")
+		logger.Info("Context cancelled, exiting TranslateSubtitleFromQueue function")
 		return
 	default:
 		db := database.GetDB()

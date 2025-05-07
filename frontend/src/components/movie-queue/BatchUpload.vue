@@ -14,6 +14,13 @@
     targetLanguages: string[];
   }
 
+  interface SelectedAudioFile {
+    file: File;
+    name: string;
+    sourceLanguage: string;
+    targetLanguages: string[];
+  }
+
   const emit = defineEmits<{
     (e: 'onQueue'): void;
     (e: 'onClose'): void;
@@ -25,6 +32,9 @@
   const files = ref<File[]>([]);
   const selectedFiles = ref<SelectedFile[]>([]);
   const languages = ref<backend.Language[]>([]);
+  const activeTab = ref('subtitle');
+  const audioFiles = ref<File[]>([]);
+  const selectedAudioFiles = ref<SelectedAudioFile[]>([]);
 
   onMounted(() => {
     getLanguages();
@@ -61,6 +71,20 @@
     );
   });
 
+  const canSaveAudio = computed(() => {
+    if (selectedAudioFiles.value.length === 0) {
+      return false;
+    }
+
+    return selectedAudioFiles.value.every(
+      (file) => 
+        file.name && 
+        file.sourceLanguage && 
+        file.targetLanguages.length > 0 &&
+        !file.targetLanguages.includes(file.sourceLanguage)
+    );
+  });
+
   const onFilesSelected = () => {
     if (!files.value || files.value.length === 0) {
       selectedFiles.value = [];
@@ -93,34 +117,44 @@
     });
   };
 
-  const validateSourceLanguage = (src: string) => {
-    const index = selectedFiles.value.findIndex(
-      (file) => file.sourceLanguage === src
-    );
+  const onAudioFilesSelected = () => {
+    if (!audioFiles.value || audioFiles.value.length === 0) {
+      selectedAudioFiles.value = [];
+      return;
+    }
+
+    selectedAudioFiles.value = audioFiles.value.map((file) => ({
+      file,
+      name: file.name.replace(/\.[^/.]+$/, ''),
+      sourceLanguage: '',
+      targetLanguages: [],
+    }));
+  };
+
+  const validateSourceLanguage = (src: string, index: number, type: 'subtitle' | 'audio') => {
+    const files = type === 'subtitle' ? selectedFiles.value : selectedAudioFiles.value;
     if (index !== -1) {
-      const targetLangs = selectedFiles.value[index].targetLanguages;
+      const targetLangs = files[index].targetLanguages;
       if (src && targetLangs.includes(src)) {
-        selectedFiles.value[index].sourceLanguage = '';
-        errors.value[`source_${index}`] =
+        files[index].sourceLanguage = '';
+        errors.value[`${type}_source_${index}`] =
           'Source language cannot be in target languages';
       } else {
-        delete errors.value[`source_${index}`];
+        delete errors.value[`${type}_source_${index}`];
       }
     }
   };
 
-  const validateTargetLanguages = (tgt: string[]) => {
-    const index = selectedFiles.value.findIndex(
-      (file) => file.targetLanguages === tgt
-    );
+  const validateTargetLanguages = (tgt: string[], index: number, type: 'subtitle' | 'audio') => {
+    const files = type === 'subtitle' ? selectedFiles.value : selectedAudioFiles.value;
     if (index !== -1) {
-      const src = selectedFiles.value[index].sourceLanguage;
+      const src = files[index].sourceLanguage;
       if (src && tgt.includes(src)) {
-        selectedFiles.value[index].targetLanguages = [];
-        errors.value[`target_${index}`] =
+        files[index].targetLanguages = [];
+        errors.value[`${type}_target_${index}`] =
           'Target languages cannot include source language';
       } else {
-        delete errors.value[`target_${index}`];
+        delete errors.value[`${type}_target_${index}`];
       }
     }
   };
@@ -145,29 +179,57 @@
 
     try {
       saving.value = true;
-      const req: backend.AddToQueueRequest[] = await Promise.all(
-        selectedFiles.value.map(async (file) => ({
-          name: file.name,
-          content: await file.file.text(),
-          source_language: file.sourceLanguage,
-          target_languages: file.targetLanguages,
-        }))
-      );
+      let req: backend.AddToQueueRequest[] = [];
+
+      if (activeTab.value === 'subtitle') {
+        req = await Promise.all(
+          selectedFiles.value.map(async (file) => ({
+            name: file.name,
+            type: 'subtitle',
+            file_type: 'srt',
+            content: await file.file.text(),
+            source_language: file.sourceLanguage,
+            target_languages: file.targetLanguages,
+          }))
+        );
+      } else {
+        // Handle audio files
+        req = await Promise.all(
+          selectedAudioFiles.value.map(async (file): Promise<backend.AddToQueueRequest> => {
+            // Convert audio file to base64
+            const arrayBuffer = await file.file.arrayBuffer();
+            const base64 = btoa(
+              Array.from(new Uint8Array(arrayBuffer))
+                .map(byte => String.fromCharCode(byte))
+                .join('')
+            );
+            
+            return {
+              name: file.name,
+              type: 'audio',
+              file_type: file.file.name.split('.').pop() || '',
+              content: base64,
+              source_language: file.sourceLanguage,
+              target_languages: file.targetLanguages,
+            };
+          })
+        );
+      }
 
       await AddToQueue(req);
-
       EventsEmit('on-queue-added', req);
 
       $q.notify({
         color: 'positive',
-        message: 'Movies added to queue successfully',
+        message: 'Files added to queue successfully',
       });
 
       emit('onQueue');
     } catch (error) {
+      console.error('Failed to add files to queue:', error);
       $q.notify({
         color: 'negative',
-        message: 'Failed to add movies to queue',
+        message: 'Failed to add files to queue',
       });
     } finally {
       saving.value = false;
@@ -207,81 +269,171 @@
     </q-card-section>
 
     <q-card-section class="q-mt-lg">
-      <q-file
-        outlined
-        use-chips
-        clearable
-        v-model="files"
-        label="Select SRT files"
-        multiple
-        append
-        accept=".srt"
-        @update:model-value="onFilesSelected"
-        @clear="onFilesSelected"
+      <q-tabs
+        v-model="activeTab"
+        class="text-primary"
+        active-color="primary"
+        indicator-color="primary"
+        align="justify"
       >
-        <template v-slot:prepend>
-          <q-icon name="attach_file" />
-        </template>
-      </q-file>
+        <q-tab name="subtitle" label="Subtitle Files" />
+        <q-tab name="audio" label="Audio Files" />
+      </q-tabs>
 
-      <q-card
-        v-if="selectedFiles.length > 0"
-        class="q-mt-md"
-      >
-        <q-card-section
-          v-for="(file, index) in selectedFiles"
-          :key="index"
-          class="q-pb-none"
-        >
-          <div class="row q-col-gutter-md">
-            <div class="col-6">
-              <q-input
-                dense
-                v-model="file.name"
-                outlined
-                label="Movie Name"
-                :rules="[(val) => !!val || 'Movie name is required']"
-              />
-            </div>
-            <div class="col-3">
-              <q-select
-                dense
-                outlined
-                v-model="file.sourceLanguage"
-                :options="languages"
-                option-value="code"
-                option-label="name"
-                emit-value
-                map-options
-                label="Subtitle Language"
-                :rules="[(val) => !!val || 'Subtitle language is required']"
-                @update:model-value="validateSourceLanguage"
-              />
-            </div>
-            <div class="col-3">
-              <q-select
-                dense
-                outlined
-                v-model="file.targetLanguages"
-                :options="languages"
-                option-value="code"
-                option-label="name"
-                emit-value
-                map-options
-                use-chips
-                multiple
-                label="Target Languages"
-                :rules="[
-                  (val) =>
-                    val.length > 0 ||
-                    'At least one target language is required',
-                ]"
-                @update:model-value="validateTargetLanguages"
-              />
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
+      <q-tab-panels v-model="activeTab" animated>
+        <q-tab-panel name="subtitle">
+          <q-file
+            outlined
+            use-chips
+            clearable
+            v-model="files"
+            label="Select SRT files"
+            multiple
+            append
+            accept=".srt"
+            @update:model-value="onFilesSelected"
+            @clear="onFilesSelected"
+          >
+            <template v-slot:prepend>
+              <q-icon name="attach_file" />
+            </template>
+          </q-file>
+
+          <q-card
+            v-if="selectedFiles.length > 0"
+            class="q-mt-md"
+          >
+            <q-card-section
+              v-for="(file, index) in selectedFiles"
+              :key="index"
+              class="q-pb-none"
+            >
+              <div class="row q-col-gutter-md">
+                <div class="col-6">
+                  <q-input
+                    dense
+                    v-model="file.name"
+                    outlined
+                    label="Movie Name"
+                    :rules="[(val) => !!val || 'Movie name is required']"
+                  />
+                </div>
+                <div class="col-3">
+                  <q-select
+                    dense
+                    outlined
+                    v-model="file.sourceLanguage"
+                    :options="languages"
+                    option-value="code"
+                    option-label="name"
+                    emit-value
+                    map-options
+                    label="Subtitle Language"
+                    :rules="[(val) => !!val || 'Subtitle language is required']"
+                    @update:model-value="(val) => validateSourceLanguage(val, index, 'subtitle')"
+                  />
+                </div>
+                <div class="col-3">
+                  <q-select
+                    dense
+                    outlined
+                    v-model="file.targetLanguages"
+                    :options="languages"
+                    option-value="code"
+                    option-label="name"
+                    emit-value
+                    map-options
+                    use-chips
+                    multiple
+                    label="Target Languages"
+                    :rules="[
+                      (val) =>
+                        val.length > 0 ||
+                        'At least one target language is required',
+                    ]"
+                    @update:model-value="(val) => validateTargetLanguages(val, index, 'subtitle')"
+                  />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </q-tab-panel>
+
+        <q-tab-panel name="audio">
+          <q-file
+            outlined
+            use-chips
+            clearable
+            v-model="audioFiles"
+            label="Select Audio files"
+            multiple
+            append
+            accept="audio/*"
+            @update:model-value="onAudioFilesSelected"
+            @clear="onAudioFilesSelected"
+          >
+            <template v-slot:prepend>
+              <q-icon name="audiotrack" />
+            </template>
+          </q-file>
+
+          <q-card v-if="selectedAudioFiles.length > 0" class="q-mt-md">
+            <q-card-section
+              v-for="(file, index) in selectedAudioFiles"
+              :key="index"
+              class="q-pb-none"
+            >
+              <div class="row q-col-gutter-md">
+                <div class="col-6">
+                  <q-input
+                    dense
+                    v-model="file.name"
+                    outlined
+                    label="Movie Name"
+                    :rules="[(val) => !!val || 'Movie name is required']"
+                  />
+                </div>
+                <div class="col-3">
+                  <q-select
+                    dense
+                    outlined
+                    v-model="file.sourceLanguage"
+                    :options="languages"
+                    option-value="code"
+                    option-label="name"
+                    emit-value
+                    map-options
+                    label="Audio Language"
+                    :rules="[(val) => !!val || 'Audio language is required']"
+                    @update:model-value="(val) => validateSourceLanguage(val, index, 'audio')"
+                  />
+                </div>
+                <div class="col-3">
+                  <q-select
+                    dense
+                    outlined
+                    v-model="file.targetLanguages"
+                    :options="languages"
+                    option-value="code"
+                    option-label="name"
+                    emit-value
+                    map-options
+                    use-chips
+                    multiple
+                    label="Target Languages"
+                    :rules="[
+                      (val) =>
+                        val.length > 0 ||
+                        'At least one target language is required',
+                    ]"
+                    @update:model-value="(val) => validateTargetLanguages(val, index, 'audio')"
+                  />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </q-tab-panel>
+      </q-tab-panels>
     </q-card-section>
 
     <q-card-actions
@@ -300,7 +452,7 @@
         label="Save to Queue"
         color="primary"
         @click="saveToQueue"
-        :disable="!canSave"
+        :disable="activeTab === 'subtitle' ? !canSave : !canSaveAudio || saving"
       />
     </q-card-actions>
   </q-card>

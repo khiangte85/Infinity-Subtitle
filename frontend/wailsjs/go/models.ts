@@ -2,6 +2,8 @@ export namespace backend {
 	
 	export class AddToQueueRequest {
 	    name: string;
+	    type: string;
+	    file_type: string;
 	    content: string;
 	    source_language: string;
 	    target_languages: string[];
@@ -13,6 +15,8 @@ export namespace backend {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.file_type = source["file_type"];
 	        this.content = source["content"];
 	        this.source_language = source["source_language"];
 	        this.target_languages = source["target_languages"];
@@ -166,6 +170,8 @@ export namespace backend {
 	    id: number;
 	    movie_id: sql.NullInt64;
 	    name: string;
+	    type: string;
+	    file_type: string;
 	    content: string;
 	    source_language: string;
 	    target_languages: Record<string, string>;
@@ -184,6 +190,8 @@ export namespace backend {
 	        this.id = source["id"];
 	        this.movie_id = this.convertValues(source["movie_id"], sql.NullInt64);
 	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.file_type = source["file_type"];
 	        this.content = source["content"];
 	        this.source_language = source["source_language"];
 	        this.target_languages = source["target_languages"];

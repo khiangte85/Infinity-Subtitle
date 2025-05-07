@@ -3,10 +3,12 @@ package backend
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"infinity-subtitle/backend/database"
 	"infinity-subtitle/backend/logger"
+	"os"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -16,6 +18,8 @@ type MovieQueue struct {
 	ID              int               `json:"id"`
 	MovieID         sql.NullInt64     `json:"movie_id"`
 	Name            string            `json:"name"`
+	Type            string            `json:"type"`
+	FileType        string            `json:"file_type"`
 	Content         string            `json:"content"`
 	SourceLanguage  string            `json:"source_language"`
 	TargetLanguages map[string]string `json:"target_languages"`
@@ -31,6 +35,8 @@ type MovieQueueResponse struct {
 
 type AddToQueueRequest struct {
 	Name            string   `json:"name"`
+	Type            string   `json:"type"`
+	FileType        string   `json:"file_type"`
 	Content         string   `json:"content"`
 	SourceLanguage  string   `json:"source_language"`
 	TargetLanguages []string `json:"target_languages"`
@@ -38,9 +44,9 @@ type AddToQueueRequest struct {
 
 const (
 	MovieQueueStatusPending = iota
+	MovieQueueStatusAudioTranscribed
 	MovieQueueStatusMovieCreated
 	MovieQueueStatusSubtitleCreated
-	MovieQueueStatusTranslating
 	MovieQueueStatusSubtitleTranslated
 	MovieQueueStatusFailed
 )
@@ -71,7 +77,8 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 
 	offset := (pagination.Page - 1) * pagination.RowsPerPage
 
-	query = "SELECT id, movie_id, name, source_language, target_languages, status, created_at, processed_at FROM movies_queue"
+	query = "SELECT id, movie_id, name, type, file_type, source_language, target_languages, status," +
+		"created_at, processed_at FROM movies_queue"
 	if name != "" {
 		query += " WHERE name LIKE ?"
 		args = append(args, "%"+name+"%")
@@ -105,6 +112,8 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 			&movie.ID,
 			&movie.MovieID,
 			&movie.Name,
+			&movie.Type,
+			&movie.FileType,
 			&movie.SourceLanguage,
 			&targetLanguagesJSON,
 			&movie.Status,
@@ -153,8 +162,8 @@ func (mq *MovieQueue) AddToQueue(req []AddToQueueRequest) error {
 
 	stmt, err := db.Prepare(`
 		INSERT INTO movies_queue (
-			name, content, source_language, target_languages, status, created_at
-		) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+			name, type, file_type, content, source_language, target_languages, status, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -173,14 +182,12 @@ func (mq *MovieQueue) AddToQueue(req []AddToQueueRequest) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal target languages: %w", err)
 		}
-		_, err = stmt.Exec(r.Name, r.Content, r.SourceLanguage, targetLanguagesJSON)
+
+		// Always set initial status to pending
+		_, err = stmt.Exec(r.Name, r.Type, r.FileType, r.Content, r.SourceLanguage, targetLanguagesJSON, MovieQueueStatusPending)
 		if err != nil {
 			return fmt.Errorf("failed to add movie to queue: %w", err)
 		}
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to add movies to queue: %w", err)
 	}
 
 	return nil
@@ -197,23 +204,23 @@ func (mq *MovieQueue) DeleteFromQueue(id int) error {
 	return nil
 }
 
-func CreateMovieFromQueue(ctx context.Context) {
+func CreateMovieFromQueue(ctx context.Context) error {
 	logger, err := logger.GetLogger()
 	if err != nil {
-		logger.Error("failed to get logger: %w", err)
+		return fmt.Errorf("failed to get logger: %w", err)
 	}
 
 	select {
 	case <-ctx.Done():
 		logger.Info("Context cancelled, exiting CreateMovieFromQueue function")
-		return
+		return nil
 	default:
 		db := database.GetDB()
 
 		lang := NewLanguage()
 		langs, err := lang.GetAllLanguages()
 		if err != nil {
-			logger.Error("failed to get languages: %w", err)
+			return fmt.Errorf("failed to get languages: %w", err)
 		}
 
 		langMap := make(map[string]string)
@@ -224,13 +231,16 @@ func CreateMovieFromQueue(ctx context.Context) {
 		m := NewMovie()
 
 		rows, err := db.QueryContext(ctx, `
-		SELECT id, name, content, source_language, target_languages, status
+		SELECT id, name, type, file_type, content, source_language, target_languages, status
 		FROM movies_queue 
 		WHERE movie_id IS NULL
-		AND status = ?
-	`, MovieQueueStatusPending)
+		AND (
+			(type = 'subtitle' AND status = ?) OR
+			(type = 'audio' AND status = ?)
+		)
+	`, MovieQueueStatusPending, MovieQueueStatusAudioTranscribed)
 		if err != nil {
-			logger.Error("failed to get movies from queue: %w", err)
+			return fmt.Errorf("failed to get movies from queue: %w", err)
 		}
 		defer rows.Close()
 
@@ -239,39 +249,35 @@ func CreateMovieFromQueue(ctx context.Context) {
 		for rows.Next() {
 			var mq MovieQueue
 			var targetLanguagesJSON []byte
-			err := rows.Scan(&mq.ID, &mq.Name, &mq.Content, &mq.SourceLanguage, &targetLanguagesJSON, &mq.Status)
+			err := rows.Scan(&mq.ID, &mq.Name, &mq.Type, &mq.FileType, &mq.Content, &mq.SourceLanguage, &targetLanguagesJSON, &mq.Status)
 			if err != nil {
-				logger.Error("failed to scan movie from queue: %w", err)
+				return fmt.Errorf("failed to scan movie from queue: %w", err)
 			}
 			err = json.Unmarshal(targetLanguagesJSON, &mq.TargetLanguages)
 			if err != nil {
-				logger.Error("failed to unmarshal target languages: %w", err)
-				continue
+				return fmt.Errorf("failed to unmarshal target languages: %w", err)
 			}
 			movies = append(movies, mq)
 		}
 
 		if err = rows.Err(); err != nil {
-			logger.Error("failed to get movies from queue: %w", err)
+			return fmt.Errorf("failed to get movies from queue: %w", err)
 		}
 
 		for _, mq := range movies {
-
 			tx, err := db.BeginTx(ctx, nil)
 			if err != nil {
-				logger.Error("failed to begin transaction: %w", err)
-				continue
+				return fmt.Errorf("failed to begin transaction: %w", err)
 			}
 
 			mq.TargetLanguages[mq.SourceLanguage] = langMap[mq.SourceLanguage]
 
 			m, err := m.CreateMovie(mq.Name, mq.SourceLanguage, mq.TargetLanguages)
 			if err != nil {
-				logger.Error("failed to create movie from queue id: %d: %w", mq.ID, err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				continue
+				return fmt.Errorf("failed to create movie from queue id: %d: %w", mq.ID, err)
 			}
 			logger.Info("movie created from queue id: %d", mq.ID)
 
@@ -279,38 +285,37 @@ func CreateMovieFromQueue(ctx context.Context) {
 				"UPDATE movies_queue SET movie_id = ?, status = ? WHERE id = ?",
 				m.ID, MovieQueueStatusMovieCreated, mq.ID)
 			if err != nil {
-				logger.Error("failed to update status of movie queue id: %d: %w", mq.ID, err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				continue
+				return fmt.Errorf("failed to update status of movie queue id: %d: %w", mq.ID, err)
 			}
 
 			if err = tx.Commit(); err != nil {
-				logger.Error("failed to commit transaction: %w", err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				continue
+				return fmt.Errorf("failed to commit transaction: %w", err)
 			}
 
 			logger.Info("movie queue id status created: %d", mq.ID)
 			mq.Status = MovieQueueStatusMovieCreated
-			runtime.EventsEmit(ctx, "movie-created", mq)
+			runtime.EventsEmit(ctx, "movie-created", mq.ID, MovieQueueStatusMovieCreated)
 		}
+		return nil
 	}
 }
 
-func CreateSubtitleFromQueue(ctx context.Context) {
+func CreateSubtitleFromQueue(ctx context.Context) error {
 	logger, err := logger.GetLogger()
 	if err != nil {
-		logger.Error("failed to get logger: %w", err)
+		return fmt.Errorf("failed to get logger: %w", err)
 	}
 
 	select {
 	case <-ctx.Done():
 		logger.Info("Context cancelled, exiting CreateSubtitleFromQueue function")
-		return
+		return nil
 	default:
 		db := database.GetDB()
 
@@ -327,8 +332,7 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 		AND mq.status = ?
 	`, MovieQueueStatusMovieCreated)
 		if err != nil {
-			logger.Error("failed to get movies from queue: %w", err)
-			return
+			return fmt.Errorf("failed to get movies from queue: %w", err)
 		}
 		defer rows.Close()
 
@@ -350,18 +354,15 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 				&mwc.Movie.ID, &mwc.Movie.Title, &mwc.Movie.DefaultLanguage, &jsonLanguages,
 				&mwc.Movie.CreatedAt, &mwc.Movie.UpdatedAt)
 			if err != nil {
-				logger.Error("failed to scan movie from queue: %w", err)
-				continue
+				return fmt.Errorf("failed to scan movie from queue: %w", err)
 			}
 			err = json.Unmarshal(jsonLanguages, &mwc.Movie.Languages)
 			if err != nil {
-				logger.Error("failed to unmarshal languages: %w", err)
-				continue
+				return fmt.Errorf("failed to unmarshal languages: %w", err)
 			}
 			err = json.Unmarshal(targetLanguagesJSON, &mwc.MQ.TargetLanguages)
 			if err != nil {
-				logger.Error("failed to unmarshal target languages: %w", err)
-				continue
+				return fmt.Errorf("failed to unmarshal target languages: %w", err)
 			}
 			if processedAt.Valid {
 				mwc.MQ.ProcessedAt = &processedAt.Time
@@ -370,63 +371,57 @@ func CreateSubtitleFromQueue(ctx context.Context) {
 		}
 
 		if err = rows.Err(); err != nil {
-			logger.Error("failed to get movies from queue: %w", err)
-			return
+			return fmt.Errorf("failed to get movies from queue: %w", err)
 		}
 
 		for _, mwc := range moviesWithContent {
 			tx, err := db.BeginTx(ctx, nil)
 			if err != nil {
-				logger.Error("failed to begin transaction: %w", err)
-				continue
+				return fmt.Errorf("failed to begin transaction: %w", err)
 			}
 
 			err = s.ImportFromSRTFile(mwc.Movie, mwc.MQ.Content)
 			if err != nil {
-				logger.Error("failed to create subtitle from queue id: %d: %w", mwc.MQ.ID, err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				continue
+				return fmt.Errorf("failed to create subtitle from queue id: %d: %w", mwc.MQ.ID, err)
 			}
 
 			logger.Info("subtitle created from queue %d", mwc.MQ.ID)
 			_, err = tx.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
 				MovieQueueStatusSubtitleCreated, mwc.Movie.ID)
 			if err != nil {
-				logger.Error("failed to update status of movie queue id: %d: %w", mwc.MQ.ID, err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				continue
+				return fmt.Errorf("failed to update status of movie queue id: %d: %w", mwc.MQ.ID, err)
 			}
 
 			if err = tx.Commit(); err != nil {
-				logger.Error("failed to commit transaction: %w", err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				continue
+				return fmt.Errorf("failed to commit transaction: %w", err)
 			}
 
 			logger.Info("subtitle queue id status created: %d", mwc.MQ.ID)
-			mwc.MQ.Status = MovieQueueStatusSubtitleCreated
-			runtime.EventsEmit(ctx, "subtitle-created", mwc.MQ)
+			runtime.EventsEmit(ctx, "subtitle-created", mwc.MQ.ID, MovieQueueStatusSubtitleCreated)
 		}
+		return nil
 	}
-
 }
 
-func TranslateSubtitleFromQueue(ctx context.Context) {
+func TranslateSubtitleFromQueue(ctx context.Context) error {
 	logger, err := logger.GetLogger()
 	if err != nil {
-		logger.Error("failed to get logger: %w", err)
+		return fmt.Errorf("failed to get logger: %w", err)
 	}
 
 	select {
 	case <-ctx.Done():
 		logger.Info("Context cancelled, exiting TranslateSubtitleFromQueue function")
-		return
+		return nil
 	default:
 		db := database.GetDB()
 
@@ -439,8 +434,7 @@ func TranslateSubtitleFromQueue(ctx context.Context) {
 		AND movie_id != 0
 		`, MovieQueueStatusSubtitleCreated)
 		if err != nil {
-			logger.Error("failed to get movies from queue: %w", err)
-			return
+			return fmt.Errorf("failed to get movies from queue: %w", err)
 		}
 		defer rows.Close()
 
@@ -450,38 +444,25 @@ func TranslateSubtitleFromQueue(ctx context.Context) {
 			var targetLanguagesJSON []byte
 			err := rows.Scan(&movie.ID, &movie.DefaultLanguage, &targetLanguagesJSON)
 			if err != nil {
-				logger.Error("failed to scan movie id: %w", err)
-				continue
+				return fmt.Errorf("failed to scan movie id: %w", err)
 			}
 			err = json.Unmarshal(targetLanguagesJSON, &movie.Languages)
 			if err != nil {
-				logger.Error("failed to unmarshal target languages: %w", err)
-				continue
+				return fmt.Errorf("failed to unmarshal target languages: %w", err)
 			}
 			movies = append(movies, movie)
 		}
 
 		if err = rows.Err(); err != nil {
-			logger.Error("failed to get movies from queue: %w", err)
-			return
+			return fmt.Errorf("failed to get movies from queue: %w", err)
 		}
 
 		s := NewSubtitle()
 
 		for _, movie := range movies {
-			// _, err = db.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
-			// 	MovieQueueStatusTranslating, movie.ID)
-			// if err != nil {
-			// 	logger.Error("failed to update status of movie queue id: %d: %w", movie.ID, err)
-			// 	continue
-			// }
-			// logger.Info("subtitle translating: %d", movie.ID)
-			// runtime.EventsEmit(ctx, "subtitle-translating", movie.ID, MovieQueueStatusTranslating)
-
 			tx, err := db.BeginTx(ctx, nil)
 			if err != nil {
-				logger.Error("failed to begin transaction: %w", err)
-				continue
+				return fmt.Errorf("failed to begin transaction: %w", err)
 			}
 
 			for code := range movie.Languages {
@@ -491,31 +472,146 @@ func TranslateSubtitleFromQueue(ctx context.Context) {
 
 				err = s.TranslateSubtitles(movie.ID, movie.DefaultLanguage, code)
 				if err != nil {
-					logger.Error("failed to translate subtitles: %w", err)
-					continue
+					if rollbackErr := tx.Rollback(); rollbackErr != nil {
+						logger.Error("failed to rollback transaction: %w", rollbackErr)
+					}
+					return fmt.Errorf("failed to translate subtitles: %w", err)
 				}
 			}
 
 			_, err = tx.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
 				MovieQueueStatusSubtitleTranslated, movie.ID)
 			if err != nil {
-				logger.Error("failed to update status of movie queue id: %d: %w", movie.ID, err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
+				return fmt.Errorf("failed to update status of movie queue id: %d: %w", movie.ID, err)
 			}
 
 			if err = tx.Commit(); err != nil {
-				logger.Error("failed to commit transaction: %w", err)
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				continue
+				return fmt.Errorf("failed to commit transaction: %w", err)
 			}
 
 			logger.Info("subtitle queue id status translated: %d", movie.ID)
 			runtime.EventsEmit(ctx, "subtitle-translated", movie.ID, MovieQueueStatusSubtitleTranslated)
 		}
+		return nil
+	}
+}
 
+func TranscribeAudioFromQueue(ctx context.Context) error {
+	logger, err := logger.GetLogger()
+	if err != nil {
+		return fmt.Errorf("failed to get logger: %w", err)
+	}
+
+	select {
+	case <-ctx.Done():
+		logger.Info("Context cancelled, exiting TranscribeAudioFromQueue function")
+		return nil
+	default:
+		db := database.GetDB()
+
+		// Use a transaction for the entire query to prevent locks
+		tx, err := db.BeginTx(ctx, &sql.TxOptions{
+			Isolation: sql.LevelSerializable,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer func() {
+			if err != nil {
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					logger.Error("failed to rollback transaction: %w", rollbackErr)
+				}
+			}
+		}()
+
+		// First, try to get and lock a single row
+		rows, err := tx.QueryContext(ctx, `
+		SELECT id, name, file_type, content, source_language, target_languages, status
+		FROM movies_queue 
+		WHERE status = ? AND type = 'audio'
+		LIMIT 1
+		`, MovieQueueStatusPending)
+		if err != nil {
+			return fmt.Errorf("failed to get audio files from queue: %w", err)
+		}
+		defer rows.Close()
+
+		var mq MovieQueue
+		var targetLanguagesJSON []byte
+		var found bool
+
+		// Only process one file at a time
+		if rows.Next() {
+			found = true
+			err := rows.Scan(&mq.ID, &mq.Name, &mq.FileType, &mq.Content, &mq.SourceLanguage, &targetLanguagesJSON, &mq.Status)
+			if err != nil {
+				return fmt.Errorf("failed to scan audio file from queue: %w", err)
+			}
+
+			err = json.Unmarshal(targetLanguagesJSON, &mq.TargetLanguages)
+			if err != nil {
+				return fmt.Errorf("failed to unmarshal target languages: %w", err)
+			}
+		}
+
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("error iterating audio files: %w", err)
+		}
+
+		if !found {
+			// No files to process, commit the transaction and return
+			if err = tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+			return nil
+		}
+
+		// Decode base64 content
+		audioData, err := base64.StdEncoding.DecodeString(mq.Content)
+		if err != nil {
+			return fmt.Errorf("failed to decode base64 audio content: %w", err)
+		}
+
+		// Create a temporary file for the audio
+		tmpFile, err := os.CreateTemp("", "audio-*."+mq.FileType)
+		if err != nil {
+			return fmt.Errorf("failed to create temporary file: %w", err)
+		}
+		defer os.Remove(tmpFile.Name())
+
+		// Write audio data to temporary file
+		if _, err := tmpFile.Write(audioData); err != nil {
+			return fmt.Errorf("failed to write audio data to temporary file: %w", err)
+		}
+		tmpFile.Close()
+
+		// Call transcription service
+		srtContent, err := transcribeAudio(tmpFile.Name(), mq.SourceLanguage)
+		if err != nil {
+			return fmt.Errorf("failed to transcribe audio: %w", err)
+		}
+
+		// Update queue status and content with transcribed text
+		_, err = tx.ExecContext(ctx,
+			"UPDATE movies_queue SET content = ?, status = ? WHERE id = ?",
+			srtContent, MovieQueueStatusAudioTranscribed, mq.ID)
+		if err != nil {
+			return fmt.Errorf("failed to update audio transcription status: %w", err)
+		}
+
+		// Commit the transaction
+		if err = tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
+		}
+
+		logger.Info("audio transcription completed for queue id: %d", mq.ID)
+		runtime.EventsEmit(ctx, "audio-transcribed", mq.ID, MovieQueueStatusAudioTranscribed)
+		return nil
 	}
 }

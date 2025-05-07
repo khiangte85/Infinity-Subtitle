@@ -15,6 +15,7 @@ type App struct {
 	wg         sync.WaitGroup
 	cancelFunc context.CancelFunc
 	logger     *logger.Logger
+	dbMutex    sync.Mutex // Add mutex for database access
 }
 
 // NewApp creates a new App application struct
@@ -34,7 +35,6 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize database
 	err := database.GetDB().Init()
-
 	if err != nil {
 		a.logger.Error("Error initializing database:", err.Error())
 	}
@@ -57,8 +57,15 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting createMovieFromQueue goroutine")
 				return
 			default:
-				backend.CreateMovieFromQueue(a.ctx)
-				time.Sleep(2 * time.Second)
+				a.dbMutex.Lock()
+				err := backend.CreateMovieFromQueue(a.ctx)
+				a.dbMutex.Unlock()
+				if err != nil {
+					a.logger.Error("Error in CreateMovieFromQueue:", err.Error())
+					time.Sleep(2 * time.Second) // Add delay on error
+					continue
+				}
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}()
@@ -73,8 +80,15 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting createSubtitleFromQueue goroutine")
 				return
 			default:
-				backend.CreateSubtitleFromQueue(a.ctx)
-				time.Sleep(2 * time.Second)
+				a.dbMutex.Lock()
+				err := backend.CreateSubtitleFromQueue(a.ctx)
+				a.dbMutex.Unlock()
+				if err != nil {
+					a.logger.Error("Error in CreateSubtitleFromQueue:", err.Error())
+					time.Sleep(2 * time.Second) // Add delay on error
+					continue
+				}
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}()
@@ -89,12 +103,41 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting translateSubtitleFromQueue goroutine")
 				return
 			default:
-				backend.TranslateSubtitleFromQueue(a.ctx)
-				time.Sleep(2 * time.Second)
+				a.dbMutex.Lock()
+				err := backend.TranslateSubtitleFromQueue(a.ctx)
+				a.dbMutex.Unlock()
+				if err != nil {
+					a.logger.Error("Error in TranslateSubtitleFromQueue:", err.Error())
+					time.Sleep(2 * time.Second) // Add delay on error
+					continue
+				}
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}()
 
+	// Run TranscribeAudioFromQueue worker
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		for {
+			select {
+			case <-a.ctx.Done():
+				a.logger.Info("Context cancelled, exiting transcribeAudioFromQueue goroutine")
+				return
+			default:
+				a.dbMutex.Lock()
+				err := backend.TranscribeAudioFromQueue(a.ctx)
+				a.dbMutex.Unlock()
+				if err != nil {
+					a.logger.Error("Error in TranscribeAudioFromQueue:", err.Error())
+					time.Sleep(2 * time.Second) // Add delay on error
+					continue
+				}
+				time.Sleep(5 * time.Second)
+			}
+		}
+	}()
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -115,5 +158,4 @@ func (a *App) shutdown(ctx context.Context) {
 	case <-ctx.Done():
 		a.logger.Info("Shutdown timed out, forcing shutdown")
 	}
-
 }

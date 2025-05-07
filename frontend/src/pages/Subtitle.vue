@@ -342,7 +342,6 @@
     <template v-slot:body-cell="props">
       <q-td :props="props">
         <q-input
-          :readonly="props.col.name == movie?.default_language"
           v-model="props.row[props.col.name]"
           dense
           outlined

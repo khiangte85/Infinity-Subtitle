@@ -96,6 +96,8 @@ func createMoviesQueueTable(db *sql.DB) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		movie_id INTEGER,
 		name TEXT NOT NULL,
+		type TEXT NOT NULL,
+		file_type TEXT,
 		content LONGTEXT NOT NULL,
 		source_language TEXT NOT NULL,
 		target_languages JSON NOT NULL,

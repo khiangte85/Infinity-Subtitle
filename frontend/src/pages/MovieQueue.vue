@@ -31,6 +31,26 @@
       sortable: true,
     },
     {
+      name: 'type',
+      label: 'Type',
+      field: 'type',
+      align: 'left' as const,
+      sortable: true,
+      format: (val: string) => {
+        return val.toUpperCase();
+      },
+    },
+    {
+      name: 'file_type',
+      label: 'File Type',
+      field: 'file_type',
+      align: 'left' as const,
+      sortable: true,
+      format: (val: string) => {
+        return val.toUpperCase();
+      },
+    },
+    {
       name: 'source_language',
       label: 'Source Language',
       field: 'source_language',
@@ -86,28 +106,29 @@
     rowsNumber: 0,
   });
 
-  EventsOn('movie-created', (data: backend.MovieQueue) => {
-    movies.value = movies.value.map((movie) => {
-      if (movie.id === data.id) {
-        return data;
-      }
-      return movie;
-    });
-  });
-
-  EventsOn('subtitle-created', (data: backend.MovieQueue) => {
-    movies.value = movies.value.map((movie) => {
-      if (movie.id === data.id) {
-        return data;
-      }
-      return movie;
-    });
-  });
-
-  EventsOn('subtitle-translating', (id: number, status: number) => {
+  EventsOn('audio-transcribed', (id: number, status: number) => {
     movies.value = movies.value.map((movie) => {
       if (movie.id === id) {
         movie.status = status;
+      }
+      return movie;
+    });
+  });
+
+  EventsOn('movie-created', (id: number, status: number) => {
+    movies.value = movies.value.map((movie) => {
+      if (movie.id === id) {
+        movie.status = status;
+      }
+      return movie;
+    });
+  });
+
+  EventsOn('subtitle-created', (id: number, status: number) => {
+    movies.value = movies.value.map((movie) => {
+      if (movie.id === id) {
+        movie.status = status;
+        return movie;
       }
       return movie;
     });
@@ -131,7 +152,7 @@
       case 2:
         return 'primary';
       case 3:
-        return 'grey';
+        return 'primary';
       case 4:
         return 'green';
       case 5:
@@ -146,15 +167,13 @@
       case 0:
         return 'Pending';
       case 1:
-        return 'Movie created';
+        return 'Audio transcribed';
       case 2:
-        return 'Subtitle created';
+        return 'Movie created';
       case 3:
-        return 'Subtitle translating';
+        return 'Subtitle Created';
       case 4:
-        return 'Subtitle translated';
-      case 5:
-        return 'Failed';
+        return 'Subtitle Translated';
       default:
         return 'Unknown';
     }

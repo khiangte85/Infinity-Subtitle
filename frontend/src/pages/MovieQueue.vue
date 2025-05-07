@@ -370,10 +370,11 @@
           flat
           round
           color="primary"
-          icon="delete"
+          icon="fas fa-trash"
           @click="deleteMovie(props.row.id)"
-          :disable="![0, 4, 5].includes(props.row.status)"
-        />
+        >
+          <q-tooltip>Delete from Queue</q-tooltip>
+        </q-btn>
       </q-td>
     </template>
   </q-table>

@@ -5,12 +5,14 @@
   import * as languageAPI from '../../wailsjs/go/backend/Language';
   import { backend } from '../../wailsjs/go/models';
   import BatchUpload from '../components/movie-queue/BatchUpload.vue';
+  import VideoToAudio from '../components/movie-queue/VideoToAudio.vue';
   import { EventsOn } from '../../wailsjs/runtime';
   const $q = useQuasar();
   const loading = ref(false);
   const languagesCodeMap = ref<Record<string, string>>({});
   const movies = ref<backend.MovieQueue[]>([]);
   const showBatchDialog = ref(false);
+  const showVideoToAudioDialog = ref(false);
   const filter = ref({
     title: '',
   });
@@ -37,7 +39,7 @@
       align: 'left' as const,
       sortable: true,
       format: (val: string) => {
-        return val.toUpperCase();
+        return val
       },
     },
     {
@@ -47,7 +49,7 @@
       align: 'left' as const,
       sortable: true,
       format: (val: string) => {
-        return val.toUpperCase();
+        return val
       },
     },
     {
@@ -265,6 +267,19 @@
     </q-card-section>
     <q-space />
     <q-card-section class="q-py-sm">
+      <!-- <q-btn
+        round
+        unelevated
+        color="primary"
+        icon="fas fa-file-audio"
+        size="sm"
+        class="q-mr-sm"
+        @click="() => {
+          showVideoToAudioDialog = true;
+        }"
+      >
+        <q-tooltip>Convert Video to Audio</q-tooltip>
+      </q-btn> -->
       <q-btn
         round
         unelevated
@@ -401,6 +416,24 @@
           });
         }
       "
+    />
+  </q-dialog>
+
+  <q-dialog
+    v-model="showVideoToAudioDialog"
+    persistent
+  >
+    <VideoToAudio
+      @onClose="() => {
+        showVideoToAudioDialog = false;
+      }"
+      @onConvert="() => {
+        showVideoToAudioDialog = false;
+        onRequest({
+          pagination: pagination,
+          filter: filter,
+        });
+      }"
     />
   </q-dialog>
 </template>

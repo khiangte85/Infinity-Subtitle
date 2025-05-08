@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",
+    "@wailsio/runtime": "^3.0.0-alpha.66",
     "quasar": "^2.18.1",
     "vue": "^3.2.37",
     "vue-router": "^4.5.0"

@@ -376,6 +376,12 @@
               <q-icon name="audiotrack" />
             </template>
           </q-file>
+          <q-badge class="q-mt-md q-pa-md" color="primary" text-color="white">
+            Command to convert video to audio:
+            <br>
+            <br>
+            ffmpeg -i [source video filepath] -vn -acodec libmp3lame -q:a 1 [output audio filepath]
+          </q-badge>
 
           <q-card v-if="selectedAudioFiles.length > 0" class="q-mt-md">
             <q-card-section
@@ -449,7 +455,7 @@
       />
       <q-btn
         size="md"
-        label="Save to Queue"
+        label="Add to Queue"
         color="primary"
         @click="saveToQueue"
         :disable="activeTab === 'subtitle' ? !canSave : !canSaveAudio || saving"

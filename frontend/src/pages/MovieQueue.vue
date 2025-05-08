@@ -110,6 +110,7 @@
     movies.value = movies.value.map((movie) => {
       if (movie.id === id) {
         movie.status = status;
+        return movie;
       }
       return movie;
     });
@@ -119,6 +120,7 @@
     movies.value = movies.value.map((movie) => {
       if (movie.id === id) {
         movie.status = status;
+        return movie;
       }
       return movie;
     });
@@ -138,6 +140,7 @@
     movies.value = movies.value.map((movie) => {
       if (movie.id === id) {
         movie.status = status;
+        return movie;
       }
       return movie;
     });

@@ -426,7 +426,7 @@ func TranslateSubtitleFromQueue(ctx context.Context) error {
 		db := database.GetDB()
 
 		rows, err := db.QueryContext(ctx, `
-		SELECT movie_id, source_language, target_languages
+		SELECT id, movie_id, source_language, target_languages
 		FROM movies_queue
 		WHERE
 		 status = ?
@@ -438,15 +438,20 @@ func TranslateSubtitleFromQueue(ctx context.Context) error {
 		}
 		defer rows.Close()
 
-		var movies []Movie
+		type MovieWithMqId struct {
+			m    Movie
+			MqId int
+		}
+
+		var movies []MovieWithMqId
 		for rows.Next() {
-			var movie Movie
+			var movie MovieWithMqId
 			var targetLanguagesJSON []byte
-			err := rows.Scan(&movie.ID, &movie.DefaultLanguage, &targetLanguagesJSON)
+			err := rows.Scan(&movie.MqId, &movie.m.ID, &movie.m.DefaultLanguage, &targetLanguagesJSON)
 			if err != nil {
 				return fmt.Errorf("failed to scan movie id: %w", err)
 			}
-			err = json.Unmarshal(targetLanguagesJSON, &movie.Languages)
+			err = json.Unmarshal(targetLanguagesJSON, &movie.m.Languages)
 			if err != nil {
 				return fmt.Errorf("failed to unmarshal target languages: %w", err)
 			}
@@ -465,12 +470,12 @@ func TranslateSubtitleFromQueue(ctx context.Context) error {
 				return fmt.Errorf("failed to begin transaction: %w", err)
 			}
 
-			for code := range movie.Languages {
-				if code == movie.DefaultLanguage {
+			for code := range movie.m.Languages {
+				if code == movie.m.DefaultLanguage {
 					continue
 				}
 
-				err = s.TranslateSubtitles(movie.ID, movie.DefaultLanguage, code)
+				err = s.TranslateSubtitles(movie.m.ID, movie.m.DefaultLanguage, code)
 				if err != nil {
 					if rollbackErr := tx.Rollback(); rollbackErr != nil {
 						logger.Error("failed to rollback transaction: %w", rollbackErr)
@@ -480,12 +485,12 @@ func TranslateSubtitleFromQueue(ctx context.Context) error {
 			}
 
 			_, err = tx.ExecContext(ctx, "UPDATE movies_queue SET status = ? WHERE movie_id = ?",
-				MovieQueueStatusSubtitleTranslated, movie.ID)
+				MovieQueueStatusSubtitleTranslated, movie.m.ID)
 			if err != nil {
 				if rollbackErr := tx.Rollback(); rollbackErr != nil {
 					logger.Error("failed to rollback transaction: %w", rollbackErr)
 				}
-				return fmt.Errorf("failed to update status of movie queue id: %d: %w", movie.ID, err)
+				return fmt.Errorf("failed to update status of movie queue id: %d: %w", movie.m.ID, err)
 			}
 
 			if err = tx.Commit(); err != nil {
@@ -495,8 +500,8 @@ func TranslateSubtitleFromQueue(ctx context.Context) error {
 				return fmt.Errorf("failed to commit transaction: %w", err)
 			}
 
-			logger.Info("subtitle queue id status translated: %d", movie.ID)
-			runtime.EventsEmit(ctx, "subtitle-translated", movie.ID, MovieQueueStatusSubtitleTranslated)
+			logger.Info("subtitle queue id status translated: %d", movie.MqId)
+			runtime.EventsEmit(ctx, "subtitle-translated", movie.MqId, MovieQueueStatusSubtitleTranslated)
 		}
 		return nil
 	}

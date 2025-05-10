@@ -368,21 +368,19 @@
             label="Select Audio files"
             multiple
             append
-            accept="audio/*"
+            accept=".mp3,.wav,audio/mp3,audio/mpeg,audio/wav,audio/wave,audio/x-wav"
             @update:model-value="onAudioFilesSelected"
             @clear="onAudioFilesSelected"
           >
             <template v-slot:prepend>
               <q-icon name="audiotrack" />
             </template>
+            <template v-slot:append>
+              <q-badge class="q-pa-md" color="primary" text-color="white">
+               Only mp3, wav, mpeg
+              </q-badge>
+            </template>
           </q-file>
-          <q-badge class="q-mt-md q-pa-md" color="primary" text-color="white">
-            Command to convert video to audio:
-            <br>
-            <br>
-            ffmpeg -i [source video filepath] -vn -acodec libmp3lame -q:a 1 [output audio filepath]
-          </q-badge>
-
           <q-card v-if="selectedAudioFiles.length > 0" class="q-mt-md">
             <q-card-section
               v-for="(file, index) in selectedAudioFiles"

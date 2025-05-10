@@ -306,7 +306,7 @@
     bordered
     :columns="columns"
     :rows="rows"
-    row-key="id"
+    row-key="row_id"
     separator="cell"
     wrap-cells
     :loading="loading"

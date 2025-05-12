@@ -25,7 +25,7 @@ type MovieQueue struct {
 	TargetLanguages map[string]string `json:"target_languages"`
 	Status          int               `json:"status"`
 	CreatedAt       time.Time         `json:"created_at"`
-	ProcessedAt     *time.Time        `json:"processed_at"`
+	UpdatedAt       *time.Time        `json:"updated_at"`
 }
 
 type MovieQueueResponse struct {
@@ -78,7 +78,7 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 	offset := (pagination.Page - 1) * pagination.RowsPerPage
 
 	query = "SELECT id, movie_id, name, type, file_type, source_language, target_languages, status," +
-		"created_at, processed_at FROM movies_queue"
+		"created_at, updated_at FROM movies_queue"
 	if name != "" {
 		query += " WHERE name LIKE ?"
 		args = append(args, "%"+name+"%")
@@ -106,7 +106,7 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 
 	for rows.Next() {
 		var movie MovieQueue
-		var processedAt sql.NullTime
+		var updatedAt sql.NullTime
 		var targetLanguagesJSON []byte
 		err := rows.Scan(
 			&movie.ID,
@@ -118,13 +118,13 @@ func (mq *MovieQueue) ListQueue(name string, pagination Pagination) (MovieQueueR
 			&targetLanguagesJSON,
 			&movie.Status,
 			&movie.CreatedAt,
-			&processedAt,
+			&updatedAt,
 		)
 		if err != nil {
 			return response, fmt.Errorf("failed to scan movie: %w", err)
 		}
-		if processedAt.Valid {
-			movie.ProcessedAt = &processedAt.Time
+		if updatedAt.Valid {
+			movie.UpdatedAt = &updatedAt.Time
 		}
 		err = json.Unmarshal(targetLanguagesJSON, &movie.TargetLanguages)
 		if err != nil {
@@ -322,7 +322,7 @@ func CreateSubtitleFromQueue(ctx context.Context) error {
 
 		rows, err := db.QueryContext(ctx, `
 		SELECT mq.id as mid, mq.movie_id, mq.name, mq.content, mq.source_language, mq.target_languages, mq.status, 
-		  mq.created_at as mq_created_at, mq.processed_at as mq_processed_at,
+		  mq.created_at as mq_created_at, mq.updated_at as mq_updated_at,
 		  m.id, m.title, m.default_language, m.languages, m.created_at, m.updated_at
 		FROM movies_queue mq
 		LEFT JOIN movies m ON mq.movie_id = m.id
@@ -345,11 +345,11 @@ func CreateSubtitleFromQueue(ctx context.Context) error {
 
 		for rows.Next() {
 			var mwc MovieWithContent
-			var processedAt sql.NullTime
+			var updatedAt sql.NullTime
 			var targetLanguagesJSON []byte
 			var jsonLanguages []byte
 			err := rows.Scan(&mwc.MQ.ID, &mwc.MQ.MovieID, &mwc.MQ.Name, &mwc.MQ.Content, &mwc.MQ.SourceLanguage,
-				&targetLanguagesJSON, &mwc.MQ.Status, &mwc.MQ.CreatedAt, &processedAt,
+				&targetLanguagesJSON, &mwc.MQ.Status, &mwc.MQ.CreatedAt, &mwc.MQ.UpdatedAt,
 				&mwc.Movie.ID, &mwc.Movie.Title, &mwc.Movie.DefaultLanguage, &jsonLanguages,
 				&mwc.Movie.CreatedAt, &mwc.Movie.UpdatedAt)
 			if err != nil {
@@ -363,8 +363,8 @@ func CreateSubtitleFromQueue(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to unmarshal target languages: %w", err)
 			}
-			if processedAt.Valid {
-				mwc.MQ.ProcessedAt = &processedAt.Time
+			if updatedAt.Valid {
+				mwc.MQ.UpdatedAt = &updatedAt.Time
 			}
 			moviesWithContent = append(moviesWithContent, mwc)
 		}

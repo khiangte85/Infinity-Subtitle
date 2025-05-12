@@ -179,7 +179,7 @@ export namespace backend {
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
-	    processed_at?: any;
+	    updated_at?: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new MovieQueue(source);
@@ -197,7 +197,7 @@ export namespace backend {
 	        this.target_languages = source["target_languages"];
 	        this.status = source["status"];
 	        this.created_at = this.convertValues(source["created_at"], null);
-	        this.processed_at = this.convertValues(source["processed_at"], null);
+	        this.updated_at = this.convertValues(source["updated_at"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"infinity-subtitle/backend/database"
+	"infinity-subtitle/backend/logger"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -120,6 +121,11 @@ func (s Subtitle) UpdateSubtitle(subtitle Subtitle) error {
 }
 
 func (s Subtitle) ImportFromSRTFile(movie Movie, fileContent string) error {
+	logger, err := logger.GetLogger()
+	if err != nil {
+		return fmt.Errorf("failed to get logger: %w", err)
+	}
+
 	db := database.GetDB()
 	if db == nil {
 		return errors.New("database connection is nil")
@@ -128,55 +134,74 @@ func (s Subtitle) ImportFromSRTFile(movie Movie, fileContent string) error {
 	fileContent = strings.TrimSpace(fileContent)
 	lines := strings.Split(fileContent, "\n")
 	var subtitles []Subtitle
+
+	contents := make(map[string]string)
+
+	for key := range movie.Languages {
+		contents[key] = ""
+	}
+
 	subtitle := &Subtitle{
 		SlNo:      0,
 		MovieID:   movie.ID,
 		StartTime: "",
 		EndTime:   "",
-		Content:   make(map[string]string),
+		Content:   contents,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
-	for key := range movie.Languages {
-		subtitle.Content[key] = ""
-	}
-
-	for _, line := range lines {
+	for i, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 
 		slNo, err := strconv.Atoi(line)
-		if err == nil && subtitle.SlNo == 0 {
+		if err == nil {
 			subtitle.SlNo = slNo
 			continue
 		}
 
-		parts := strings.Split(line, "-->")
-		if len(parts) == 2 {
-			subtitle.StartTime = strings.TrimSpace(parts[0])
-			subtitle.EndTime = strings.TrimSpace(parts[1])
-			continue
+		if strings.Contains(line, "-->") {
+			parts := strings.Split(line, "-->")
+			if len(parts) == 2 {
+				subtitle.StartTime = strings.TrimSpace(parts[0])
+				subtitle.EndTime = strings.TrimSpace(parts[1])
+				continue
+			}
 		}
 
-		subtitle.Content[movie.DefaultLanguage] = line
-		subtitles = append(subtitles, *subtitle)
+		subtitle.Content[movie.DefaultLanguage] += line + "\n"
 
-		// Reset subtitle for next iteration
-		subtitle.SlNo = 0
-		subtitle.StartTime = ""
-		subtitle.EndTime = ""
-		subtitle.Content = make(map[string]string)
-		for key := range movie.Languages {
-			subtitle.Content[key] = ""
+		nextLine := ""
+		if i+1 < len(lines) {
+			nextLine = strings.TrimSpace(lines[i+1])
+		}
+
+		if nextLine == "" {
+			subtitles = append(subtitles, *subtitle)
+			subtitle = &Subtitle{
+				SlNo:      0,
+				MovieID:   movie.ID,
+				StartTime: "",
+				EndTime:   "",
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+
+			contents := make(map[string]string)
+			for key := range movie.Languages {
+				contents[key] = ""
+			}
+			subtitle.Content = contents
 		}
 	}
 
 	// delete all subtitles for the movie
-	_, err := db.Exec("DELETE FROM subtitles WHERE movie_id = ?", movie.ID)
+	_, err = db.Exec("DELETE FROM subtitles WHERE movie_id = ?", movie.ID)
 	if err != nil {
+		logger.Error("failed to delete existing subtitles: %w", err)
 		return fmt.Errorf("failed to delete existing subtitles: %w", err)
 	}
 

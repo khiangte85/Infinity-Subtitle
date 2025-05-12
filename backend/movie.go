@@ -152,8 +152,32 @@ func (m Movie) UpdateMovie(movie Movie) error {
 
 func (m Movie) DeleteMovie(id int) error {
 	db := database.GetDB()
-	_, err := db.Exec("DELETE FROM movies WHERE id = ?", id)
-	return err
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec("DELETE FROM movies WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete movie: %w", err)
+	}
+
+	_, err = tx.Exec("DELETE FROM subtitles WHERE movie_id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete subtitles: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (m Movie) ListMovies(title string, pagination Pagination) (*ListMoviesResponse, error) {

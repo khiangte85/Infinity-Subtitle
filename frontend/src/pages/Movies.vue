@@ -2,15 +2,18 @@
   import { QTableColumn } from 'quasar';
   import { onMounted, ref, watch } from 'vue';
   import { backend as models } from '../../wailsjs/go/models.js';
-  import { ListMovies } from '../../wailsjs/go/backend/Movie.js';
+  import { ListMovies, DeleteMovie } from '../../wailsjs/go/backend/Movie.js';
   import AddMovie from '../components/movie/Add.vue';
   import EditMovie from '../components/movie/Edit.vue';
   import { GetAllLanguages } from '../../wailsjs/go/backend/Language.js';
   import { useRouter } from 'vue-router';
+  import { useQuasar } from 'quasar';
 
+  const $q = useQuasar();
   const router = useRouter();
   const loading = ref(true);
   const showEdit = ref(false);
+  const showDelete = ref(false);
   const selectedMovie = ref<models.Movie>();
   const pagination = ref<models.Pagination>({
     sortBy: 'created_at',
@@ -120,6 +123,28 @@
       languages.value = response;
     } catch (error) {
       console.error(error);
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const deleteMovie = async (id: number) => {
+    try {
+      await DeleteMovie(id);
+      onRequest({ pagination: pagination.value, filter: filter.value });
+
+      $q.notify({
+        color: 'positive',
+        message: 'Movie deleted successfully',
+      });
+    } catch (error) {
+      $q.notify({
+        color: 'negative',
+        message: 'Failed to delete movie',
+      });
+      console.error(error);
+    } finally {
+      showDelete.value = false;
     }
   };
 </script>
@@ -240,6 +265,21 @@
         >
           <q-tooltip>Subtitles</q-tooltip>
         </q-btn>
+
+        <q-btn
+          flat
+          round
+          color="negative"
+          icon="fas fa-trash"
+          @click="
+            () => {
+              selectedMovie = props.row;
+              showDelete = true;
+            }
+          "
+        >
+          <q-tooltip>Delete</q-tooltip>
+        </q-btn>
       </q-td>
     </template>
   </q-table>
@@ -267,5 +307,30 @@
         }
       "
     />
+  </q-dialog>
+
+  <q-dialog v-model="showDelete">
+    <q-card class="q-pa-sm">
+      <q-card-section>
+        <div class="text-h6">Delete Movie</div>
+        <div class="text-body">Are you sure you want to delete this movie?</div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn
+          label="Cancel"
+          flat
+          size="md"
+          color="negative"
+          @click="showDelete = false"
+        />
+        <q-btn
+          color="negative"
+          label="Delete"
+          unelevated
+          size="md"
+          @click="deleteMovie(selectedMovie?.id ?? 0)"
+        />
+      </q-card-actions>
+    </q-card>
   </q-dialog>
 </template>

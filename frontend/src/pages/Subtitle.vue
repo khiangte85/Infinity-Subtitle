@@ -36,7 +36,6 @@
     rowsNumber: 0,
   });
 
-
   interface SubtitleRow {
     row_id: number;
     sl_no: number;
@@ -182,7 +181,7 @@
   ) => {
     try {
       if (!movie.value) return;
-      if (event.key !== 'Enter') return;
+      if (!(event.ctrlKey && (event.key === 's' || event.key === 'S'))) return;
 
       const subtitle = subtitles.value.find((s) => s.id === row.row_id);
       if (!subtitle) return;
@@ -342,7 +341,9 @@
     <template v-slot:body-cell="props">
       <q-td :props="props">
         <q-input
+          type="textarea"
           v-model="props.row[props.col.name]"
+          rows="2"
           dense
           outlined
           @keyup.enter="
@@ -356,10 +357,12 @@
   <q-dialog v-model="showImport">
     <ImportSubtitle
       :movie="movie as models.Movie"
-      @onClose="() => {
-        showImport = false;
-        onRequest({ pagination });
-      }"
+      @onClose="
+        () => {
+          showImport = false;
+          onRequest({ pagination });
+        }
+      "
       @onImport="
         () => {
           showImport = false;

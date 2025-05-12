@@ -299,7 +299,6 @@ func CreateMovieFromQueue(ctx context.Context) error {
 			}
 
 			logger.Info("movie queue id status created: %d", mq.ID)
-			mq.Status = MovieQueueStatusMovieCreated
 			runtime.EventsEmit(ctx, "movie-created", mq.ID, MovieQueueStatusMovieCreated)
 		}
 		return nil

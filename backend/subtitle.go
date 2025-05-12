@@ -305,19 +305,24 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		return nil
 	}
 
+
+	var textsToTranslate []TextToTranslate
+
 	// Collect unique texts for translation
-	textsToTranslate := make(map[string]string)
 
 	for _, subtitle := range subtitles {
-		srcKey := subtitle.Content[sourceLanguage]
-		if srcKey == "" {
+		value := subtitle.Content[sourceLanguage]
+		if value == "" {
 			continue
 		}
 
-		if _, ok := textsToTranslate[srcKey]; !ok {
-			textsToTranslate[srcKey] = ""
-		}
+		textsToTranslate = append(textsToTranslate, TextToTranslate{
+			ID:    subtitle.ID,
+			SourceText:  value,
+			Translation: "",
+		})
 	}
+	
 
 	// Process translations in parallel
 	sourceLangFullText := movie.Languages[sourceLanguage]
@@ -330,12 +335,12 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	for _, subtitle := range subtitles {
-		srcKey := subtitle.Content[sourceLanguage]
-		if srcKey == "" {
+	for _, translation := range translations {
+		value := translation.SourceText
+		if value == "" {
 			continue
 		}
-		translated := translations[srcKey]
+		translated := translation.Translation
 		if translated == "" {
 			continue
 		}
@@ -344,7 +349,7 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 			SET content = json_set(content, '$.' || ?, ?),
 				updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?
-		`, targetLanguage, translated, subtitle.ID)
+		`, targetLanguage, translated, translation.ID)
 		if err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to update subtitle: %w", err)

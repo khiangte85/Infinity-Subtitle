@@ -388,7 +388,9 @@
         <template v-slot:body-cell="props">
           <q-td :props="props">
             <q-input
+              type="textarea"
               v-model="props.row[props.col.name]"
+              rows="2"
               dense
               outlined
               @keyup.enter="

@@ -10,12 +10,18 @@ import (
 
 	"infinity-subtitle/backend/logger"
 
+	"runtime"
+
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/sashabaranov/go-openai"
-	"golang.org/x/exp/maps"
 	"golang.org/x/time/rate"
-	"runtime"
 )
+
+type TextToTranslate struct {
+	ID          int    `json:"id"`
+	SourceText  string `json:"source_text"`
+	Translation string `json:"translation"`
+}
 
 type TranslationService struct {
 	client      *openai.Client
@@ -54,22 +60,25 @@ type TranslationResponse struct {
 	Translations map[string]string `json:"translations"`
 }
 
-func (ts *TranslationService) translate(ctx context.Context, texts map[string]string, sourceLang, targetLang string) (map[string]string, error) {
-	if len(texts) == 0 {
-		return make(map[string]string), nil
+func (ts *TranslationService) translate(ctx context.Context, textsToTranslate []TextToTranslate,
+	sourceLang, targetLang string) ([]TextToTranslate, error) {
+	if len(textsToTranslate) == 0 {
+		return make([]TextToTranslate, 0), nil
 	}
 
 	if err := ts.rateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	prompt := fmt.Sprintf("Translate the following texts from %s to %s.\nTexts to translate:\n", sourceLang, targetLang)
-	for text := range texts {
-		prompt += fmt.Sprintf("- %s\n", text)
+	prompt := fmt.Sprintf("Translate the following data from %s to %s: use `SourceText` value as input "+
+		" and put output value to `Translation`.\n", sourceLang, targetLang)
+	for _, text := range textsToTranslate {
+		prompt += fmt.Sprintf("%+v\n", text)
 	}
 
-	prompt += "\nOutput format should be a JSON string with the same keys as input (DO NOT CHANGE THE KEYS), " +
-		"containing only the translations. Do not include ```json ```."
+	prompt += "\nOutput format should be ARRAY of JSON. Output format should be \n" +
+		"[{\"id\": 1, \"source_text\": \"\", \"translation\": \"\"}, {\"id\": 2, \"source_text\": \"\", \"translation\": \"\"}] " +
+		"\nDO NOT INCLUDE ```json"
 
 	resp, err := ts.client.CreateChatCompletion(
 		ctx,
@@ -93,7 +102,9 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 		return nil, fmt.Errorf("no response from OpenAI")
 	}
 
-	var translations map[string]string
+	ts.logger.Info("Translation response: %s", resp.Choices[0].Message.Content)
+
+	var translations []TextToTranslate
 	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &translations)
 	if err != nil {
 		ts.logger.Error("Failed to parse translation response: %s", resp.Choices[0].Message.Content)
@@ -103,24 +114,24 @@ func (ts *TranslationService) translate(ctx context.Context, texts map[string]st
 	return translations, nil
 }
 
-func (ts *TranslationService) processBatch(ctx context.Context, texts map[string]string, sourceLang, targetLang string) map[string]string {
-	ts.logger.Info("Processing batch of %d texts", len(texts))
-	ts.logger.Info("Text to translate: %+v", texts)
+func (ts *TranslationService) processBatch(ctx context.Context, textsToTranslate []TextToTranslate,
+	sourceLang, targetLang string) []TextToTranslate {
+	ts.logger.Info("Processing batch of %d texts", len(textsToTranslate))
 
 	var wg sync.WaitGroup
-	results := make(map[string]string)
+	results := make([]TextToTranslate, 0)
 	mu := sync.Mutex{}
 
 	// Split texts into batches of 20
 	batchSize := 20
-	batches := make([]map[string]string, 0)
-	currentBatch := make(map[string]string)
+	batches := make([][]TextToTranslate, 0)
+	currentBatch := make([]TextToTranslate, 0)
 
-	for srcKey := range texts {
-		currentBatch[srcKey] = ""
+	for _, textToTranslate := range textsToTranslate {
+		currentBatch = append(currentBatch, textToTranslate)
 		if len(currentBatch) >= batchSize {
 			batches = append(batches, currentBatch)
-			currentBatch = make(map[string]string)
+			currentBatch = make([]TextToTranslate, 0)
 		}
 	}
 	if len(currentBatch) > 0 {
@@ -129,8 +140,8 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 
 	// Fan-out: Create multiple workers
 	workerCount := runtime.NumCPU()
-	batchChan := make(chan map[string]string, len(batches))
-	resultChan := make(chan map[string]string, len(batches))
+	batchChan := make(chan []TextToTranslate, len(batches))
+	resultChan := make(chan []TextToTranslate, len(batches))
 
 	// Start workers
 	for range workerCount {
@@ -141,7 +152,7 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 				translations, err := ts.translate(ctx, batch, sourceLang, targetLang)
 				if err == nil {
 					resultChan <- translations
-				} 
+				}
 			}
 		}()
 	}
@@ -161,7 +172,7 @@ func (ts *TranslationService) processBatch(ctx context.Context, texts map[string
 	// Process results
 	for translations := range resultChan {
 		mu.Lock()
-		maps.Copy(results, translations)
+		results = append(results, translations...)
 		mu.Unlock()
 	}
 

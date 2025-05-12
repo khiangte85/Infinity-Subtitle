@@ -15,7 +15,6 @@ type App struct {
 	wg         sync.WaitGroup
 	cancelFunc context.CancelFunc
 	logger     *logger.Logger
-	dbMutex    sync.Mutex // Add mutex for database access
 }
 
 // NewApp creates a new App application struct
@@ -57,9 +56,7 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting createMovieFromQueue goroutine")
 				return
 			default:
-				a.dbMutex.Lock()
 				err := backend.CreateMovieFromQueue(a.ctx)
-				a.dbMutex.Unlock()
 				if err != nil {
 					a.logger.Error("Error in CreateMovieFromQueue:", err.Error())
 					time.Sleep(2 * time.Second) // Add delay on error
@@ -80,9 +77,7 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting createSubtitleFromQueue goroutine")
 				return
 			default:
-				a.dbMutex.Lock()
 				err := backend.CreateSubtitleFromQueue(a.ctx)
-				a.dbMutex.Unlock()
 				if err != nil {
 					a.logger.Error("Error in CreateSubtitleFromQueue:", err.Error())
 					time.Sleep(2 * time.Second) // Add delay on error
@@ -103,9 +98,7 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting translateSubtitleFromQueue goroutine")
 				return
 			default:
-				a.dbMutex.Lock()
 				err := backend.TranslateSubtitleFromQueue(a.ctx)
-				a.dbMutex.Unlock()
 				if err != nil {
 					a.logger.Error("Error in TranslateSubtitleFromQueue:", err.Error())
 					time.Sleep(2 * time.Second) // Add delay on error
@@ -126,9 +119,7 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting transcribeAudioFromQueue goroutine")
 				return
 			default:
-				a.dbMutex.Lock()
 				err := backend.TranscribeAudioFromQueue(a.ctx)
-				a.dbMutex.Unlock()
 				if err != nil {
 					a.logger.Error("Error in TranscribeAudioFromQueue:", err.Error())
 					time.Sleep(2 * time.Second) // Add delay on error

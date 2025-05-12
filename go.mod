@@ -7,7 +7,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.25
 	github.com/sashabaranov/go-openai v1.39.1
 	github.com/wailsapp/wails/v2 v2.10.1
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	golang.org/x/time v0.11.0
 )
 

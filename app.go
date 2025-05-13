@@ -15,6 +15,7 @@ type App struct {
 	wg         sync.WaitGroup
 	cancelFunc context.CancelFunc
 	logger     *logger.Logger
+	dbLock     sync.Mutex
 }
 
 // NewApp creates a new App application struct
@@ -59,10 +60,8 @@ func (a *App) startup(ctx context.Context) {
 				err := backend.CreateMovieFromQueue(a.ctx)
 				if err != nil {
 					a.logger.Error("Error in CreateMovieFromQueue:", err.Error())
-					time.Sleep(2 * time.Second) // Add delay on error
-					continue
 				}
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
@@ -77,13 +76,13 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting createSubtitleFromQueue goroutine")
 				return
 			default:
+				a.dbLock.Lock()
 				err := backend.CreateSubtitleFromQueue(a.ctx)
+				a.dbLock.Unlock()
 				if err != nil {
 					a.logger.Error("Error in CreateSubtitleFromQueue:", err.Error())
-					time.Sleep(2 * time.Second) // Add delay on error
-					continue
 				}
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
@@ -98,13 +97,13 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting translateSubtitleFromQueue goroutine")
 				return
 			default:
+				a.dbLock.Lock()
 				err := backend.TranslateSubtitleFromQueue(a.ctx)
+				a.dbLock.Unlock()
 				if err != nil {
 					a.logger.Error("Error in TranslateSubtitleFromQueue:", err.Error())
-					time.Sleep(2 * time.Second) // Add delay on error
-					continue
 				}
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
@@ -119,13 +118,13 @@ func (a *App) startup(ctx context.Context) {
 				a.logger.Info("Context cancelled, exiting transcribeAudioFromQueue goroutine")
 				return
 			default:
+				a.dbLock.Lock()
 				err := backend.TranscribeAudioFromQueue(a.ctx)
+				a.dbLock.Unlock()
 				if err != nil {
 					a.logger.Error("Error in TranscribeAudioFromQueue:", err.Error())
-					time.Sleep(2 * time.Second) // Add delay on error
-					continue
 				}
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}()

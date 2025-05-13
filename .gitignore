@@ -2,6 +2,7 @@ build/bin
 node_modules
 frontend/dist
 infinity-subtitle.db
+subtitle-database.db
 models/*
 logs/*
 subtitles

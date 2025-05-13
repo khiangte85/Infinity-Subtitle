@@ -181,7 +181,14 @@
   ) => {
     try {
       if (!movie.value) return;
-      if (!(event.ctrlKey && (event.key === 's' || event.key === 'S'))) return;
+      console.log(event);
+      if (
+        !(
+          (event.ctrlKey || event.metaKey) &&
+          (event.key === 's' || event.key === 'S')
+        )
+      )
+        return;
 
       const subtitle = subtitles.value.find((s) => s.id === row.row_id);
       if (!subtitle) return;
@@ -195,7 +202,7 @@
         return;
       }
       // Update the content
-      subtitle.content[col] = String(value || '');
+      subtitle.content[col] = String(value || '').trim();
       await UpdateSubtitle(subtitle);
 
       $q.notify({
@@ -219,8 +226,8 @@
     flat
     class="full-width row justify-between items-center"
   >
-    <q-card-section class="q-py-sm q-pl-none">
-      <h6 class="text-h6">{{ movie?.title }}'s Subtitles</h6>
+    <q-card-section class="q-py-none q-pl-none">
+      <h6 class="text-h6">{{ movie?.title }}'s subtitles</h6>
     </q-card-section>
     <q-card-section class="q-py-sm">
       <div class="row q-gutter-md justify-end">
@@ -260,10 +267,21 @@
 
   <q-card
     flat
-    class="full-width row justify-between items-center q-py-md q-pb-md"
+    class="full-width row justify-between items-center q-pb-sm"
   >
+    <div class="row q-gutter-md q-ml-none">
+      <q-badge
+        class="full-width text-body2 bg-primary text-white q-mb-sm q-pa-sm"
+      >
+        <q-icon name="fas fa-keyboard" />
+        <span class="q-ml-sm"
+          >Focus on the subtitle and press Ctrl+S or Command+S to save or update
+          the subtitle</span
+        >
+      </q-badge>
+    </div>
     <q-space />
-    <div class="row q-gutter-md">
+    <div class="q-gutter-md">
       <q-select
         v-if="movie?.languages"
         v-model="selectedLanguages"
@@ -346,7 +364,10 @@
           rows="2"
           dense
           outlined
-          @keyup.enter="
+          @keyup.ctrl.s="
+            (event: KeyboardEvent) => onSubtitleUpdate(props.row, props.col.name, props.row[props.col.name], event)
+          "
+          @keyup.meta.s="
             (event: KeyboardEvent) => onSubtitleUpdate(props.row, props.col.name, props.row[props.col.name], event)
           "
         />

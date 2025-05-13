@@ -176,7 +176,5 @@ func (ts *TranslationService) processBatch(ctx context.Context, textsToTranslate
 		mu.Unlock()
 	}
 
-	ts.logger.Info("Completed translations: %+v", results)
-
 	return results
 }

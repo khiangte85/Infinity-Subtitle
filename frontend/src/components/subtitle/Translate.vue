@@ -220,8 +220,8 @@
     value: string | number | null,
     event: KeyboardEvent
   ) => {
-    if (!targetLanguage.value || col !== targetLanguage.value) return;
-    if (event.key !== 'Enter') return;
+    // if (!targetLanguage.value || col !== targetLanguage.value) return;
+    if (!((event.ctrlKey || event.metaKey)) && (event.key === 's' || event.key === 'S')) return;
 
     try {
       // Update the content
@@ -240,7 +240,7 @@
         return;
       }
 
-      subtitle.content[col] = String(value || '');
+      subtitle.content[col] = String(value || '').trim();
       await UpdateSubtitle(subtitle);
       $q.notify({
         message: 'Subtitle updated successfully',
@@ -350,6 +350,10 @@
     </q-card-section>
 
     <q-card-section v-if="sourceLanguage">
+      <q-badge class="full-width text-body2 bg-primary text-white q-mb-sm q-pa-sm">
+        <q-icon name="fas fa-keyboard" />
+        <span class="q-ml-sm">Focus on the subtitle and press Ctrl+S or Command+S to save or update the subtitle</span>
+      </q-badge>
       <q-table
         class="text-left table-sticky-header"
         flat
@@ -393,7 +397,7 @@
               rows="2"
               dense
               outlined
-              @keyup.enter="
+              @keyup.ctrl.s="
                 (event: KeyboardEvent) => onSubtitleUpdate(props.row, props.col.name, props.row[props.col.name], event)
               "
               :disable="loading"

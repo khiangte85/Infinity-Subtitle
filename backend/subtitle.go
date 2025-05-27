@@ -305,24 +305,27 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		return nil
 	}
 
-
 	var textsToTranslate []TextToTranslate
 
 	// Collect unique texts for translation
 
 	for _, subtitle := range subtitles {
-		value := subtitle.Content[sourceLanguage]
-		if value == "" {
+		sourceText := subtitle.Content[sourceLanguage]
+		if sourceText == "" {
+			continue
+		}
+
+		targetText := subtitle.Content[targetLanguage]
+		if targetText != "" {
 			continue
 		}
 
 		textsToTranslate = append(textsToTranslate, TextToTranslate{
-			ID:    subtitle.ID,
-			SourceText:  value,
+			ID:          subtitle.ID,
+			SourceText:  sourceText,
 			Translation: "",
 		})
 	}
-	
 
 	// Process translations in parallel
 	sourceLangFullText := movie.Languages[sourceLanguage]

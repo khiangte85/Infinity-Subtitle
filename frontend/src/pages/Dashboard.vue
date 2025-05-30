@@ -2,5 +2,5 @@
 </script>
 
 <template>
-  <h5 class="text-h5">Dashboard</h5>
+  <h5 class="text-h5">{{ $t('Dashboard') }}</h5>
 </template>

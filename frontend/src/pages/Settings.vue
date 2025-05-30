@@ -50,16 +50,16 @@
 <template>
   <q-card flat>
     <q-card-section>
-      <h6 class="text-h6">Settings</h6>
+      <h6 class="text-h6">{{ $t('Settings') }}</h6>
     </q-card-section>
 
     <q-card-section>
-      <div class="text-subtitle2 q-mb-sm">OpenAI API Key</div>
+      <div class="text-subtitle2 q-mb-sm">{{ $t('OpenAI API Key') }}</div>
       <div class="row q-col-gutter-md">
         <div class="col-12 col-md-6">
           <q-input
             v-model="apiKey"
-            label="API Key"
+            :label="$t('API Key')"
             outlined
             :type="showKey ? 'text' : 'password'"
             :loading="loading"
@@ -88,7 +88,7 @@
         @click="saveKey"
         :disable="!apiKey"
       >
-        Save Changes
+        {{ $t('Save') }} Changes
       </q-btn>
     </q-card-section>
   </q-card>

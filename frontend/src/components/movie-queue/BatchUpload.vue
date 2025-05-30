@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { ref, computed, onMounted } from 'vue';
   import { useQuasar } from 'quasar';
+  import { useI18n } from 'vue-i18n';
   import Error from '../Error.vue';
   import { backend } from '../../../wailsjs/go/models';
   import { AddToQueue } from '../../../wailsjs/go/backend/MovieQueue';
@@ -21,6 +22,7 @@
     targetLanguages: string[];
   }
 
+  const { t } = useI18n();
   const emit = defineEmits<{
     (e: 'onQueue'): void;
     (e: 'onClose'): void;
@@ -138,7 +140,7 @@
       if (src && targetLangs.includes(src)) {
         files[index].sourceLanguage = '';
         errors.value[`${type}_source_${index}`] =
-          'Source language cannot be in target languages';
+          t('Source language cannot be in target languages');
       } else {
         delete errors.value[`${type}_source_${index}`];
       }
@@ -152,7 +154,7 @@
       if (src && tgt.includes(src)) {
         files[index].targetLanguages = [];
         errors.value[`${type}_target_${index}`] =
-          'Target languages cannot include source language';
+          t('Target languages cannot include source language');
       } else {
         delete errors.value[`${type}_target_${index}`];
       }
@@ -172,7 +174,7 @@
     if (Object.keys(errors.value).length > 0) {
       $q.notify({
         color: 'negative',
-        message: 'Please fix the validation errors before saving',
+        message: t('Please fix the validation errors before saving'),
       });
       return;
     }
@@ -221,7 +223,7 @@
 
       $q.notify({
         color: 'positive',
-        message: 'Files added to queue successfully',
+        message: t('Files added to queue successfully'),
       });
 
       emit('onQueue');
@@ -229,7 +231,7 @@
       console.error('Failed to add files to queue:', error);
       $q.notify({
         color: 'negative',
-        message: 'Failed to add files to queue',
+        message: t('Failed to add files to queue'),
       });
     } finally {
       saving.value = false;
@@ -248,7 +250,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Create Batch</span>
+      <span class="text-body2">{{ $t('Create Batch') }}</span>
       <q-space />
       <q-btn
         dense
@@ -257,7 +259,7 @@
         @click="emit('onClose')"
         :disable="saving"
       >
-        <q-tooltip>Close</q-tooltip>
+        <q-tooltip>{{ $t('Close') }}</q-tooltip>
       </q-btn>
     </q-bar>
 
@@ -276,8 +278,8 @@
         indicator-color="primary"
         align="justify"
       >
-        <q-tab name="subtitle" label="Subtitle Files" />
-        <q-tab name="audio" label="Audio Files" />
+        <q-tab name="subtitle" :label="$t('Subtitle Files')" />
+        <q-tab name="audio" :label="$t('Audio Files')" />
       </q-tabs>
 
       <q-tab-panels v-model="activeTab" animated>
@@ -287,7 +289,7 @@
             use-chips
             clearable
             v-model="files"
-            label="Select SRT files"
+            :label="$t('Select SRT files')"
             multiple
             append
             accept=".srt"
@@ -314,8 +316,8 @@
                     dense
                     v-model="file.name"
                     outlined
-                    label="Movie Name"
-                    :rules="[(val) => !!val || 'Movie name is required']"
+                    :label="$t('Movie Name')"
+                    :rules="[(val) => !!val || $t('Movie name is required')]"
                   />
                 </div>
                 <div class="col-3">
@@ -328,8 +330,8 @@
                     option-label="name"
                     emit-value
                     map-options
-                    label="Subtitle Language"
-                    :rules="[(val) => !!val || 'Subtitle language is required']"
+                    :label="$t('Subtitle Language')"
+                    :rules="[(val) => !!val || $t('Subtitle language is required')]"
                     @update:model-value="(val) => validateSourceLanguage(val, index, 'subtitle')"
                   />
                 </div>
@@ -345,11 +347,11 @@
                     map-options
                     use-chips
                     multiple
-                    label="Target Languages"
+                    :label="$t('Target Languages')"
                     :rules="[
                       (val) =>
                         val.length > 0 ||
-                        'At least one target language is required',
+                        $t('At least one target language is required'),
                     ]"
                     @update:model-value="(val) => validateTargetLanguages(val, index, 'subtitle')"
                   />
@@ -365,7 +367,7 @@
             use-chips
             clearable
             v-model="audioFiles"
-            label="Select Audio files"
+            :label="$t('Select Audio files')"
             multiple
             append
             accept=".mp3,.wav,audio/mp3,audio/mpeg,audio/wav,audio/wave,audio/x-wav"
@@ -377,7 +379,7 @@
             </template>
             <template v-slot:append>
               <q-badge class="q-pa-md" color="primary" text-color="white">
-               Only mp3, wav, mpeg
+               {{ $t('Only mp3, wav, mpeg') }}
               </q-badge>
             </template>
           </q-file>
@@ -393,8 +395,8 @@
                     dense
                     v-model="file.name"
                     outlined
-                    label="Movie Name"
-                    :rules="[(val) => !!val || 'Movie name is required']"
+                    :label="$t('Movie Name')"
+                    :rules="[(val) => !!val || $t('Movie name is required')]"
                   />
                 </div>
                 <div class="col-3">
@@ -407,8 +409,8 @@
                     option-label="name"
                     emit-value
                     map-options
-                    label="Audio Language"
-                    :rules="[(val) => !!val || 'Audio language is required']"
+                    :label="$t('Audio Language')"
+                    :rules="[(val) => !!val || $t('Audio language is required')]"
                     @update:model-value="(val) => validateSourceLanguage(val, index, 'audio')"
                   />
                 </div>
@@ -424,11 +426,11 @@
                     map-options
                     use-chips
                     multiple
-                    label="Target Languages"
+                    :label="$t('Target Languages')"
                     :rules="[
                       (val) =>
                         val.length > 0 ||
-                        'At least one target language is required',
+                        $t('At least one target language is required'),
                     ]"
                     @update:model-value="(val) => validateTargetLanguages(val, index, 'audio')"
                   />
@@ -446,14 +448,14 @@
     >
       <q-btn
         flat
-        label="Close"
+        :label="$t('Close')"
         color="negative"
         @click="emit('onClose')"
         :disable="saving"
       />
       <q-btn
         size="md"
-        label="Add to Queue"
+        :label="$t('Add to Queue')"
         color="primary"
         @click="saveToQueue"
         :disable="activeTab === 'subtitle' ? !canSave : !canSaveAudio || saving"

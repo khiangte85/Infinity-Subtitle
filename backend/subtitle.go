@@ -249,21 +249,21 @@ func (s Subtitle) ImportFromSRTFile(movie Movie, fileContent string) error {
 	return nil
 }
 
-func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetLanguage string) error {
+func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetLanguage string) ([]string, error) {
 	db := database.GetDB()
 	if db == nil {
-		return errors.New("database connection is nil")
+		return nil, errors.New("database connection is nil")
 	}
 
 	movie := NewMovie()
 	movie, err := movie.GetMovieByID(movieId)
 	if err != nil {
-		return fmt.Errorf("failed to get movie: %w", err)
+		return nil, fmt.Errorf("failed to get movie: %w", err)
 	}
 
 	translationService, err := NewTranslationService()
 	if err != nil {
-		return fmt.Errorf("failed to create translation service: %w", err)
+		return nil, fmt.Errorf("failed to create translation service: %w", err)
 	}
 	defer translationService.Close()
 
@@ -277,7 +277,7 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		ORDER BY sl_no ASC
 	`, movieId)
 	if err != nil {
-		return fmt.Errorf("failed to get subtitles: %w", err)
+		return nil, fmt.Errorf("failed to get subtitles: %w", err)
 	}
 	defer rows.Close()
 
@@ -287,22 +287,22 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		var contentJson []byte
 		err := rows.Scan(&subtitle.ID, &subtitle.MovieID, &contentJson)
 		if err != nil {
-			return fmt.Errorf("failed to scan subtitle: %w", err)
+			return nil, fmt.Errorf("failed to scan subtitle: %w", err)
 		}
 
 		err = json.Unmarshal(contentJson, &subtitle.Content)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal content: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal content: %w", err)
 		}
 		subtitles = append(subtitles, subtitle)
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating subtitles: %w", err)
+		return nil, fmt.Errorf("error iterating subtitles: %w", err)
 	}
 
 	if len(subtitles) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var textsToTranslate []TextToTranslate
@@ -335,8 +335,10 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 	// Update subtitles with translations
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
+
+	var emptyTranslations []string
 
 	for _, translation := range translations {
 		value := translation.SourceText
@@ -345,6 +347,7 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		}
 		translated := translation.Translation
 		if translated == "" {
+			emptyTranslations = append(emptyTranslations, translation.SourceText)
 			continue
 		}
 		_, err = tx.Exec(`
@@ -355,15 +358,15 @@ func (s Subtitle) TranslateSubtitles(movieId int, sourceLanguage string, targetL
 		`, targetLanguage, translated, translation.ID)
 		if err != nil {
 			tx.Rollback()
-			return fmt.Errorf("failed to update subtitle: %w", err)
+			return nil, fmt.Errorf("failed to update subtitle: %w", err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return nil
+	return emptyTranslations, nil
 }
 
 func (s Subtitle) ExportSubtitle(movieId int, language string) (ExportResponse, error) {

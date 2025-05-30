@@ -1,11 +1,13 @@
 <script setup lang="ts">
   import { ref, onMounted } from 'vue';
   import { useQuasar } from 'quasar';
+  import { useI18n } from 'vue-i18n';
   import { backend as models } from '../../../wailsjs/go/models.js';
   import { CreateMovie, UpdateMovie } from '../../../wailsjs/go/backend/Movie.js';
   import { GetAllLanguages } from '../../../wailsjs/go/backend/Language.js';
   import Error from '../Error.vue';
 
+  const { t } = useI18n();
   const $q = useQuasar();
   const emit = defineEmits(['onClose', 'onUpdated']);
   const props = defineProps<{
@@ -79,7 +81,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Edit Movie</span>
+      <span class="text-body2">{{ $t('Edit Movie') }}</span>
       <q-space />
       <q-btn
         dense
@@ -87,7 +89,7 @@
         icon="fas fa-times"
         @click="emit('onClose')"
       >
-        <q-tooltip>Close</q-tooltip>
+        <q-tooltip>{{ $t('Close') }}</q-tooltip>
       </q-btn>
     </q-bar>
 
@@ -102,12 +104,12 @@
       <q-input
         :autofocus="true"
         v-model="model.title"
-        label="Title"
+        :label="$t('Title')"
         dense
         outlined
         maxlength="100"
         lazy-rules
-        :rules="[(val) => !!val || 'Field is required']"
+        :rules="[(val) => !!val || $t('Field is required')]"
       />
     </q-card-section>
 
@@ -118,7 +120,7 @@
         :autofocus="true"
         v-model="model.default_language"
         :options="languages"
-        label="Default Subtitle Language"
+        :label="$t('Default Language')"
         emit-value
         map-options
         option-label="name"
@@ -126,12 +128,12 @@
         dense
         outlined
         lazy-rules
-        :rules="[(val) => !!val || 'Field is required']"
+        :rules="[(val) => !!val || $t('Field is required')]"
       />
     </q-card-section>
 
     <q-card-section class="q-pb-none">
-      <div class="text-subtitle2 q-mb-sm">Subtitle Languages</div>
+      <div class="text-subtitle2 q-mb-sm">{{ $t('Subtitle Languages') }}</div>
       <div class="row">
         <template
           v-for="(lang, index) in languages"
@@ -158,14 +160,14 @@
         class="q-px-md"
         @click="emit('onClose')"
         :disable="saving"
-        >Cancel</q-btn
+        >{{ $t('Cancel') }}</q-btn
       >
       <q-btn
         color="primary"
         class="q-px-md q-ml-md"
         @click="onSubmit"
         :disable="saving"
-        >Save</q-btn
+        >{{ $t('Save') }}</q-btn
       >
     </q-card-section>
   </q-card>

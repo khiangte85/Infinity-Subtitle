@@ -1,10 +1,12 @@
 <script setup lang="ts">
   import { ref, computed } from 'vue';
   import { useQuasar } from 'quasar';
+  import { useI18n } from 'vue-i18n';
   import { ImportFromSRTFile } from '../../../wailsjs/go/backend/Subtitle.js';
   import { backend as models } from '../../../wailsjs/go/models.js';
   import Error from '../Error.vue';
 
+  const { t } = useI18n();
   const $q = useQuasar();
   const props = defineProps<{
     movie: models.Movie;
@@ -27,7 +29,7 @@
       } else {
         selectedFile.value = null;
         errors.value = {
-          error: 'Invalid file type. Please select a .srt file',
+          error: t('Invalid file type. Please select a .srt file'),
         };
       }
     } else {
@@ -39,14 +41,14 @@
   async function onSubmit() {
     if (!selectedFile.value) {
       errors.value = {
-        error: 'Please select a .srt file',
+        error: t('Please select a .srt file'),
       };
       return;
     }
 
     if (!selectedFile.value.name.endsWith('.srt')) {
       errors.value = {
-        error: 'Invalid file type. Please select a .srt file',
+        error: t('Invalid file type. Please select a .srt file'),
       };
       return;
     }
@@ -63,7 +65,7 @@
       emit('onClose');
     } catch (err: any) {
       errors.value = {
-        error: err.message || 'Failed to upload subtitle file',
+        error: err.message || t('Failed to upload subtitle file'),
       };
     } finally {
       saving.value = false;
@@ -82,7 +84,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Import default language subtitle</span>
+      <span class="text-body2">{{ $t('Import default language subtitle') }}</span>
       <q-space />
       <q-btn
         dense
@@ -90,7 +92,7 @@
         icon="fas fa-times"
         @click="emit('onClose')"
       >
-        <q-tooltip>Close</q-tooltip>
+        <q-tooltip>{{ $t('Close') }}</q-tooltip>
       </q-btn>
     </q-bar>
 
@@ -102,7 +104,7 @@
     </q-card-section>
 
     <q-card-section class="q-pb-none">
-      <div class="text-subtitle2 q-mb-sm">Subtitle File (.srt)</div>
+      <div class="text-subtitle2 q-mb-sm">{{ $t('Subtitle File (.srt)') }}</div>
       <div class="text-subtitle2 q-mt-sm">
         <q-icon
           name="warning"
@@ -110,15 +112,14 @@
           class="q-mr-sm"
         />
         <span class="text-negative"
-          >This will overwrite all existing subtitles of this Movie<br />Subtitle
-          file must be in the default language ({{
+          >{{ $t('This will overwrite all existing subtitles of this Movie') }}<br />{{ $t('Subtitle file must be in the default language') }} ({{
             movie.languages[movie.default_language]
           }})</span
         >
       </div>
       <q-file
         v-model="selectedFile"
-        label="Select .srt file"
+        :label="$t('Select .srt file')"
         accept=".srt"
         outlined
         :error="Object.keys(errors).length > 0"
@@ -139,14 +140,14 @@
         class="q-px-md"
         @click="emit('onClose')"
         :disable="saving"
-        >Cancel</q-btn
+        >{{ $t('Cancel') }}</q-btn
       >
       <q-btn
         color="primary"
         class="q-px-md q-ml-md"
         @click="onSubmit"
         :disable="saving || isImportDisabled"
-        >Import</q-btn
+        >{{ $t('Import') }}</q-btn
       >
     </q-card-section>
   </q-card>

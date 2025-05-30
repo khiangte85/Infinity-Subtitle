@@ -29,6 +29,8 @@ type TranslationService struct {
 	logger      *logger.Logger
 }
 
+const retryCount = 3
+
 func NewTranslationService() (*TranslationService, error) {
 	log, err := logger.GetLogger()
 	if err != nil {
@@ -70,9 +72,70 @@ func (ts *TranslationService) translate(ctx context.Context, textsToTranslate []
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
+	// Initial translation attempt
+	translations, err := ts.performTranslation(ctx, textsToTranslate, sourceLang, targetLang)
+	if err != nil {
+		return nil, err
+	}
+
+	// Retry logic for blank translations
+	for attempt := range retryCount {
+		blankTranslations := make([]TextToTranslate, 0)
+
+		// Find translations that came back blank
+		for _, translation := range translations {
+			if translation.Translation == "" {
+				blankTranslations = append(blankTranslations, translation)
+			}
+		}
+
+		if len(blankTranslations) == 0 {
+			break // All translations are complete
+		}
+
+		ts.logger.Info("Retry attempt %d for %d blank translations", attempt, len(blankTranslations))
+
+		// Wait for rate limiter before retry
+		if err := ts.rateLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("rate limit exceeded on retry %d: %w", attempt, err)
+		}
+
+		// Retry translation for blank entries
+		retryTranslations, err := ts.performTranslation(ctx, blankTranslations, sourceLang, targetLang)
+		if err != nil {
+			ts.logger.Error("Retry attempt %d failed: %v", attempt, err)
+			continue // Try next attempt
+		}
+
+		// Merge retry results back into main translations
+		translationMap := make(map[int]string)
+		for _, retryTranslation := range retryTranslations {
+			if retryTranslation.Translation != "" {
+				translationMap[retryTranslation.ID] = retryTranslation.Translation
+			}
+		}
+
+		// Update original translations with retry results
+		for i := range translations {
+			if newTranslation, exists := translationMap[translations[i].ID]; exists {
+				translations[i].Translation = newTranslation
+			}
+		}
+	}
+
+	return translations, nil
+}
+
+// Extract the actual translation logic into a separate method
+func (ts *TranslationService) performTranslation(ctx context.Context, textsToTranslate []TextToTranslate,
+	sourceLang, targetLang string) ([]TextToTranslate, error) {
+
 	prompt := fmt.Sprintf("Translate the following data from %s to %s: use `SourceText` value as input "+
 		" and put output value to `Translation`.\n", sourceLang, targetLang)
 	for _, text := range textsToTranslate {
+		if text.Translation != "" {
+			continue
+		}
 		prompt += fmt.Sprintf("%+v\n", text)
 	}
 
@@ -116,7 +179,7 @@ func (ts *TranslationService) translate(ctx context.Context, textsToTranslate []
 
 func (ts *TranslationService) processBatch(ctx context.Context, textsToTranslate []TextToTranslate,
 	sourceLang, targetLang string) []TextToTranslate {
-	ts.logger.Info("Processing batch of %d texts", len(textsToTranslate))
+	ts.logger.Info("Processing subtitle file with %d lines", len(textsToTranslate))
 
 	var wg sync.WaitGroup
 	results := make([]TextToTranslate, 0)

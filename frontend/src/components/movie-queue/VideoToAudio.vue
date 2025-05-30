@@ -61,7 +61,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Convert Video to Audio</span>
+      <span class="text-body2">{{ $t('Convert Video to Audio') }}</span>
       <q-space />
       <q-btn
         dense
@@ -70,13 +70,13 @@
         @click="emit('onClose')"
         :disable="converting"
       >
-        <q-tooltip>Close</q-tooltip>
+        <q-tooltip>{{ $t('Close') }}</q-tooltip>
       </q-btn>
     </q-bar>
 
     <q-card-section>
       <q-btn
-        label="Select Video File"
+        :label="$t('Select Video File')"
         color="primary"
         @click="selectFile"
       />
@@ -88,13 +88,13 @@
     >
       <q-btn
         flat
-        label="Cancel"
+        :label="$t('Cancel')"
         color="negative"
         v-close-popup
         @click="emit('onClose')"
       />
       <q-btn
-        label="Convert"
+        :label="$t('Convert')"
         color="primary"
         @click="convertVideoToAudio"
         :loading="converting"

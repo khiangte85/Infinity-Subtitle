@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { ref, computed, onMounted } from 'vue';
   import { useQuasar } from 'quasar';
+  import { useI18n } from 'vue-i18n';
   import { backend as models } from '../../../wailsjs/go/models.js';
   import {
     GetSubtitlesByMovieID,
@@ -10,6 +11,7 @@
   import Error from '../Error.vue';
   import { QTableColumn } from 'quasar';
 
+  const { t } = useI18n();
   const $q = useQuasar();
   const props = defineProps<{
     movie: models.Movie;
@@ -44,14 +46,14 @@
     let tempColumns: QTableColumn[] = [
       {
         name: 'sl_no',
-        label: 'Sl No',
+        label: t('Sl No'),
         field: 'sl_no',
         align: 'left' as const,
         sortable: false,
       },
       {
         name: 'time',
-        label: 'Time',
+        label: t('Time'),
         field: 'time',
         align: 'left' as const,
         sortable: false,
@@ -114,7 +116,7 @@
     } catch (error) {
       console.error(error);
       $q.notify({
-        message: 'Failed to load subtitles',
+        message: t('Failed to load subtitles'),
         color: 'negative',
         icon: 'fas fa-times',
       });
@@ -142,7 +144,7 @@
       }
     } catch (error) {
       console.error(error);
-      errors.value = { error: 'Failed to load subtitles' };
+      errors.value = { error: t('Failed to load subtitles') };
     } finally {
       loading.value = false;
     }
@@ -161,7 +163,7 @@
     } catch (error) {
       console.error(error);
       $q.notify({
-        message: 'Failed to load subtitles',
+        message: t('Failed to load subtitles'),
         color: 'negative',
         icon: 'fas fa-times',
       });
@@ -183,9 +185,9 @@
 
     if (!hasContent) {
       errors.value = {
-        error: `No subtitles available in ${
-          props.movie.languages[sourceLanguage.value]
-        }`,
+        error: t('No subtitles available in {language}', {
+          language: props.movie.languages[sourceLanguage.value]
+        }),
       };
       sourceLanguage.value = '';
       return false;
@@ -200,7 +202,7 @@
     errors.value = {};
     if (sourceLanguage.value === targetLanguage.value) {
       errors.value = {
-        error: 'Source and target languages cannot be the same',
+        error: t('Source and target languages cannot be the same'),
       };
       targetLanguage.value = '';
       return false;
@@ -233,7 +235,7 @@
 
       if (value === null || value === undefined || value === '') {
         $q.notify({
-          message: 'Subtitle cannot be empty',
+          message: t('Subtitle cannot be empty'),
           color: 'negative',
           icon: 'fas fa-times',
         });
@@ -243,14 +245,14 @@
       subtitle.content[col] = String(value || '').trim();
       await UpdateSubtitle(subtitle);
       $q.notify({
-        message: 'Subtitle updated successfully',
+        message: t('Subtitle updated successfully'),
         color: 'primary',
         icon: 'fas fa-check',
       });
     } catch (error) {
       console.error(error);
       $q.notify({
-        message: 'Failed to update subtitle',
+        message: t('Failed to update subtitle'),
         color: 'negative',
         icon: 'fas fa-times',
       });
@@ -273,14 +275,14 @@
       onRequest({ pagination: pagination.value });
 
       $q.notify({
-        message: 'Subtitles translation completed',
+        message: t('Subtitles translation completed'),
         color: 'primary',
         icon: 'fas fa-check',
       });
     } catch (error) {
       console.error(error);
       $q.notify({
-        message: 'Failed to translate subtitles',
+        message: t('Failed to translate subtitles'),
         color: 'negative',
         icon: 'fas fa-times',
       });
@@ -301,7 +303,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Translate Subtitles</span>
+      <span class="text-body2">{{ $t('Translate Subtitles') }}</span>
       <q-space />
       <q-btn
         dense
@@ -309,7 +311,7 @@
         icon="fas fa-times"
         @click="emit('onClose')"
       >
-        <q-tooltip>Close</q-tooltip>
+        <q-tooltip>{{ $t('Close') }}</q-tooltip>
       </q-btn>
     </q-bar>
 
@@ -326,7 +328,7 @@
           <q-select
             v-model="sourceLanguage"
             :options="languageOptions"
-            label="Source Language"
+            :label="$t('Source Language')"
             outlined
             emit-value
             map-options
@@ -338,7 +340,7 @@
           <q-select
             v-model="targetLanguage"
             :options="languageOptions"
-            label="Target Language"
+            :label="$t('Target Language')"
             outlined
             emit-value
             map-options
@@ -352,7 +354,7 @@
     <q-card-section v-if="sourceLanguage">
       <q-badge class="full-width text-body2 bg-primary text-white q-mb-sm q-pa-sm">
         <q-icon name="fas fa-keyboard" />
-        <span class="q-ml-sm">Focus on the subtitle and press Ctrl+S or Command+S to save or update the subtitle</span>
+        <span class="q-ml-sm">{{ $t('Focus on the subtitle and press Ctrl+S to save or update the subtitle') }}</span>
       </q-badge>
       <q-table
         class="text-left table-sticky-header"
@@ -365,11 +367,11 @@
         separator="cell"
         wrap-cells
         :loading="loading"
-        :no-data-label="loading ? 'Loading...' : 'No subtitles found'"
+        :no-data-label="loading ? $t('Loading...') : $t('No subtitles found')"
         :resizable-columns="true"
         v-model:pagination="pagination"
         :rows-per-page-options="[20]"
-        rows-per-page-label="Records per page"
+        :rows-per-page-label="$t('Records per page')"
         :style="{ height: 'calc(100vh - 300px)' }"
         @request="onRequest"
       >
@@ -414,14 +416,14 @@
         class="q-px-md"
         @click="emit('onClose')"
         :disable="loading"
-        >Close</q-btn
+        >{{ $t('Close') }}</q-btn
       >
       <q-btn
         color="primary"
         class="q-px-md q-ml-md"
         @click="onSubmit"
         :disable="!sourceLanguage || !targetLanguage || loading"
-        >Translate</q-btn
+        >{{ $t('Translate') }}</q-btn
       >
     </q-card-section>
   </q-card>

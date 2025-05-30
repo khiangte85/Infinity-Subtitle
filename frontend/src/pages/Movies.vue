@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { QTableColumn } from 'quasar';
   import { onMounted, ref, watch } from 'vue';
+  import { useI18n } from 'vue-i18n';
   import { backend as models } from '../../wailsjs/go/models.js';
   import { ListMovies, DeleteMovie } from '../../wailsjs/go/backend/Movie.js';
   import AddMovie from '../components/movie/Add.vue';
@@ -9,6 +10,7 @@
   import { useRouter } from 'vue-router';
   import { useQuasar } from 'quasar';
 
+  const { t } = useI18n();
   const $q = useQuasar();
   const router = useRouter();
   const loading = ref(true);
@@ -33,21 +35,21 @@
   const columns: QTableColumn[] = [
     {
       name: 'id',
-      label: '#',
+      label: t('#'),
       field: 'id',
       sortable: true,
       align: 'left',
     },
     {
       name: 'title',
-      label: 'Title',
+      label: t('Title'),
       field: 'title',
       sortable: true,
       align: 'left',
     },
     {
       name: 'default_language',
-      label: 'Default Language',
+      label: t('Default Language'),
       field: 'default_language',
       sortable: true,
       align: 'left',
@@ -60,7 +62,7 @@
     },
     {
       name: 'languages',
-      label: 'Subtitle Languages',
+      label: t('Subtitle Languages'),
       field: 'languages',
       sortable: true,
       align: 'left',
@@ -72,7 +74,7 @@
     },
     {
       name: 'created_at',
-      label: 'Created At',
+      label: t('Created At'),
       field: 'created_at',
       sortable: true,
       align: 'left',
@@ -82,7 +84,7 @@
     },
     {
       name: 'actions',
-      label: 'Actions',
+      label: t('Actions'),
       field: 'actions',
       align: 'left',
       sortable: false,
@@ -135,12 +137,12 @@
 
       $q.notify({
         color: 'positive',
-        message: 'Movie deleted successfully',
+        message: t('Movie deleted successfully'),
       });
     } catch (error) {
       $q.notify({
         color: 'negative',
-        message: 'Failed to delete movie',
+        message: t('Failed to delete movie'),
       });
       console.error(error);
     } finally {
@@ -155,7 +157,7 @@
     class="full-width row justify-between items-center"
   >
     <q-card-section class="q-py-sm q-pl-none">
-      <h5 class="text-h5">Movies</h5>
+      <h5 class="text-h5">{{ $t('Movies') }}</h5>
     </q-card-section>
     <q-space />
     <q-card-section class="q-py-sm">
@@ -171,7 +173,7 @@
           }
         "
       >
-        <q-tooltip> Add Movie </q-tooltip>
+        <q-tooltip>{{ $t('Add Movie') }}</q-tooltip>
       </q-btn>
     </q-card-section>
   </q-card>
@@ -190,7 +192,7 @@
         v-model="filter.title"
         autocomplete="off"
         clearable
-        placeholder="Search"
+        :placeholder="$t('Search')"
         :style="{ minWidth: '400px', maxWidth: '600px' }"
       />
 
@@ -210,7 +212,7 @@
           }
         "
       >
-        <q-tooltip>Clear</q-tooltip>
+        <q-tooltip>{{ $t('Clear') }}</q-tooltip>
       </q-btn>
     </q-card-section>
   </q-card>
@@ -230,7 +232,7 @@
     v-model:pagination="pagination"
     :rows-per-page-options="[10, 20, 50]"
     binary-state-sort
-    rows-per-page-label="Records per page"
+    :rows-per-page-label="$t('Records per page')"
     @request="onRequest"
   >
     <template v-slot:body-cell-actions="props">
@@ -251,7 +253,7 @@
             }
           "
         >
-          <q-tooltip>Edit</q-tooltip>
+          <q-tooltip>{{ $t('Edit') }}</q-tooltip>
         </q-btn>
 
         <q-btn
@@ -263,7 +265,7 @@
           size="sm"
           :to="`/movies/${props.row.id}/subtitles`"
         >
-          <q-tooltip>Subtitles</q-tooltip>
+          <q-tooltip>{{ $t('Subtitles') }}</q-tooltip>
         </q-btn>
 
         <q-btn
@@ -278,7 +280,7 @@
             }
           "
         >
-          <q-tooltip>Delete</q-tooltip>
+          <q-tooltip>{{ $t('Delete') }}</q-tooltip>
         </q-btn>
       </q-td>
     </template>
@@ -312,12 +314,12 @@
   <q-dialog v-model="showDelete">
     <q-card class="q-pa-sm">
       <q-card-section>
-        <div class="text-h6">Delete Movie</div>
-        <div class="text-body">Are you sure you want to delete this movie?</div>
+        <div class="text-h6">{{ $t('Delete Movie') }}</div>
+        <div class="text-body">{{ $t('Are you sure you want to delete this movie?') }}</div>
       </q-card-section>
       <q-card-actions align="right">
         <q-btn
-          label="Cancel"
+          :label="$t('Cancel')"
           flat
           size="md"
           color="negative"
@@ -325,7 +327,7 @@
         />
         <q-btn
           color="negative"
-          label="Delete"
+          :label="$t('Delete')"
           unelevated
           size="md"
           @click="deleteMovie(selectedMovie?.id ?? 0)"

@@ -1,9 +1,12 @@
 <script setup lang="ts">
   import { ref } from 'vue';
+  import { useI18n } from 'vue-i18n';
   import { backend as models } from '../../../wailsjs/go/models.js';
   import { ExportSubtitle as ExportSubtitleAPI } from '../../../wailsjs/go/backend/Subtitle.js';
   import { useQuasar } from 'quasar';
   import Error from '../Error.vue';
+
+  const { t } = useI18n();
 
   declare global {
     interface Window {
@@ -37,7 +40,7 @@
   const onExport = async () => {
     if (!language.value) {
       errors.value = {
-        error: 'Please select a language',
+        error: t('Please select a language'),
       };
       return;
     }
@@ -49,7 +52,7 @@
       ) as ExportResponse;
       filePath.value = response.file_path;
       $q.notify({
-        message: 'Subtitles exported successfully',
+        message: t('Subtitles exported successfully'),
         color: 'primary',
         icon: 'fas fa-check',
         timeout: 3000,
@@ -57,7 +60,7 @@
     } catch (error) {
       console.error(error);
       errors.value = {
-        error: 'Failed to export subtitles',
+        error: t('Failed to export subtitles'),
       };
     } finally {
       loading.value = false;
@@ -83,7 +86,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Export Subtitle</span>
+      <span class="text-body2">{{ $t('Export Subtitle') }}</span>
       <q-space />
       <q-btn
         dense
@@ -91,7 +94,7 @@
         icon="fas fa-times"
         @click="emit('onClose')"
       >
-        <q-tooltip>Close</q-tooltip>
+        <q-tooltip>{{ $t('Close') }}</q-tooltip>
       </q-btn>
     </q-bar>
 
@@ -103,7 +106,7 @@
     </q-card-section>
 
     <q-card-section class="q-pb-none">
-      <div class="text-subtitle2 q-mb-sm">Select Language</div>
+      <div class="text-subtitle2 q-mb-sm">{{ $t('Select Language') }}</div>
       <q-select
         v-model="language"
         :options="
@@ -112,7 +115,7 @@
             value: code,
           }))
         "
-        label="Language"
+        :label="$t('Language')"
         outlined
         emit-value
         map-options
@@ -129,7 +132,7 @@
       v-if="filePath"
       class="q-pb-none"
     >
-      <div class="text-subtitle2 q-mb-sm">Export Location</div>
+      <div class="text-subtitle2 q-mb-sm">{{ $t('Export Location') }}</div>
       <div class="row items-center">
         <div class="col text-caption text-grey text-break">
           <div class="text-weight-medium">{{ filePath }}</div>
@@ -141,7 +144,7 @@
             icon="fas fa-folder-open"
             @click="openFileLocation"
           >
-            <q-tooltip>Open File Location</q-tooltip>
+            <q-tooltip>{{ $t('Open File Location') }}</q-tooltip>
           </q-btn>
         </div>
       </div>
@@ -154,7 +157,7 @@
         class="q-px-md"
         @click="emit('onClose')"
         :disable="loading"
-        >Close</q-btn
+        >{{ $t('Close') }}</q-btn
       >
       <q-btn
         color="primary"
@@ -162,7 +165,7 @@
         @click="onExport"
         :disable="!language || loading"
         :loading="loading"
-        >Export</q-btn
+        >{{ $t('Export') }}</q-btn
       >
     </q-card-section>
   </q-card>
@@ -178,7 +181,7 @@
         dark
         class="bg-primary text-white q-py-lg"
       >
-        <span class="text-body2">Export Complete</span>
+        <span class="text-body2">{{ $t('Export Complete') }}</span>
         <q-space />
         <q-btn
           dense
@@ -186,13 +189,13 @@
           icon="fas fa-times"
           v-close-popup
         >
-          <q-tooltip>Close</q-tooltip>
+          <q-tooltip>{{ $t('Close') }}</q-tooltip>
         </q-btn>
       </q-bar>
 
       <q-card-section>
         <div class="text-body2">
-          Subtitles have been exported successfully.
+          {{ $t('Subtitles have been exported successfully.') }}
         </div>
         <div class="text-caption text-grey q-mt-sm">
           {{ filePath }}
@@ -205,13 +208,13 @@
           color="negative"
           class="q-px-md"
           v-close-popup
-          >Close</q-btn
+          >{{ $t('Close') }}</q-btn
         >
         <q-btn
           color="primary"
           class="q-px-md q-ml-md"
           @click="openFileLocation"
-          >Open File Location</q-btn
+          >{{ $t('Open File Location') }}</q-btn
         >
       </q-card-section>
     </q-card>

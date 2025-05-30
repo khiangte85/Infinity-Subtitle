@@ -1,12 +1,15 @@
 <script setup lang="ts">
   import { ref, onMounted } from 'vue';
   import { useQuasar } from 'quasar';
+  import { useI18n } from 'vue-i18n';
   import * as movieQueueAPI from '../../wailsjs/go/backend/MovieQueue';
   import * as languageAPI from '../../wailsjs/go/backend/Language';
   import { backend } from '../../wailsjs/go/models';
   import BatchUpload from '../components/movie-queue/BatchUpload.vue';
   import VideoToAudio from '../components/movie-queue/VideoToAudio.vue';
   import { EventsOn } from '../../wailsjs/runtime';
+
+  const { t } = useI18n();
   const $q = useQuasar();
   const loading = ref(false);
   const languagesCodeMap = ref<Record<string, string>>({});
@@ -20,21 +23,21 @@
   const columns = [
     {
       name: 'id',
-      label: '#',
+      label: t('#'),
       field: 'id',
       align: 'left' as const,
       sortable: true,
     },
     {
       name: 'name',
-      label: 'Name',
+      label: t('Name'),
       field: 'name',
       align: 'left' as const,
       sortable: true,
     },
     {
       name: 'type',
-      label: 'Type',
+      label: t('Type'),
       field: 'type',
       align: 'left' as const,
       sortable: true,
@@ -44,7 +47,7 @@
     },
     {
       name: 'file_type',
-      label: 'File Type',
+      label: t('File Type'),
       field: 'file_type',
       align: 'left' as const,
       sortable: true,
@@ -54,28 +57,28 @@
     },
     {
       name: 'source_language',
-      label: 'Source Language',
+      label: t('Source Language'),
       field: 'source_language',
       align: 'left' as const,
       sortable: true,
     },
     {
       name: 'target_languages',
-      label: 'Target Languages',
+      label: t('Target Languages'),
       field: 'target_languages',
       align: 'left' as const,
       sortable: true,
     },
     {
       name: 'status',
-      label: 'Status',
+      label: t('Status'),
       field: 'status',
       align: 'left' as const,
       sortable: true,
     },
     {
       name: 'created_at',
-      label: 'Created At',
+      label: t('Created At'),
       field: 'created_at',
       align: 'left' as const,
       sortable: true,
@@ -94,7 +97,7 @@
     },
     {
       name: 'actions',
-      label: 'Actions',
+      label: t('Actions'),
       field: 'actions',
       align: 'right' as const,
     },
@@ -170,17 +173,17 @@
   const getStatusText = (status: number) => {
     switch (status) {
       case 0:
-        return 'Pending';
+        return t('Pending');
       case 1:
-        return 'Audio transcribed';
+        return t('Audio transcribed');
       case 2:
-        return 'Movie created';
+        return t('Movie created');
       case 3:
-        return 'Subtitle Created';
+        return t('Subtitle Created');
       case 4:
-        return 'Subtitle Translated';
+        return t('Subtitle Translated');
       default:
-        return 'Unknown';
+        return t('Unknown');
     }
   };
 
@@ -189,7 +192,7 @@
       await movieQueueAPI.DeleteFromQueue(id);
       $q.notify({
         color: 'positive',
-        message: 'Movie deleted from queue',
+        message: t('Movie deleted from queue'),
       });
       onRequest({
         pagination: pagination.value,
@@ -198,7 +201,7 @@
     } catch (error) {
       $q.notify({
         color: 'negative',
-        message: 'Failed to delete movie from queue',
+        message: t('Failed to delete movie from queue'),
       });
     }
   };
@@ -216,7 +219,7 @@
       console.error('Error fetching movies:', error);
       $q.notify({
         color: 'negative',
-        message: 'Failed to load movies queue',
+        message: t('Failed to load movies queue'),
       });
       return null;
     } finally {
@@ -263,7 +266,7 @@
     class="full-width row justify-between items-center"
   >
     <q-card-section class="q-py-sm q-pl-none">
-      <h5 class="text-h5">Queues</h5>
+      <h5 class="text-h5">{{ $t('Queues') }}</h5>
     </q-card-section>
     <q-space />
     <q-card-section class="q-py-sm">
@@ -278,7 +281,7 @@
           showVideoToAudioDialog = true;
         }"
       >
-        <q-tooltip>Convert Video to Audio</q-tooltip>
+        <q-tooltip>{{ $t('Convert Video to Audio') }}</q-tooltip>
       </q-btn> -->
       <q-btn
         round
@@ -292,7 +295,7 @@
           }
         "
       >
-        <q-tooltip> Create Batch </q-tooltip>
+        <q-tooltip>{{ $t('Create Batch') }}</q-tooltip>
       </q-btn>
     </q-card-section>
   </q-card>
@@ -311,7 +314,7 @@
         v-model="filter.title"
         autocomplete="off"
         clearable
-        placeholder="Search"
+        :placeholder="$t('Search')"
         :style="{ minWidth: '400px', maxWidth: '600px' }"
       />
 
@@ -331,7 +334,7 @@
           }
         "
       >
-        <q-tooltip>Clear</q-tooltip>
+        <q-tooltip>{{ $t('Clear') }}</q-tooltip>
       </q-btn>
     </q-card-section>
   </q-card>
@@ -351,7 +354,7 @@
     v-model:pagination="pagination"
     :rows-per-page-options="[10, 20, 50]"
     binary-state-sort
-    rows-per-page-label="Records per page"
+    :rows-per-page-label="$t('Records per page')"
     @request="onRequest"
   >
     <template v-slot:body-cell-status="props">
@@ -391,7 +394,7 @@
           icon="fas fa-trash"
           @click="deleteMovie(props.row.id)"
         >
-          <q-tooltip>Delete from Queue</q-tooltip>
+          <q-tooltip>{{ $t('Delete from Queue') }}</q-tooltip>
         </q-btn>
       </q-td>
     </template>

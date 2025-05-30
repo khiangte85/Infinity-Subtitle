@@ -53,7 +53,7 @@
       dark
       class="bg-primary text-white q-py-lg"
     >
-      <span class="text-body2">Add Language</span>
+      <span class="text-body2">{{ $t('Add Language') }}</span>
       <q-space />
       <q-btn
         dense
@@ -61,7 +61,7 @@
         icon="fas fa-times"
         @click="emit('onClose')"
       >
-        <q-tooltip>Close</q-tooltip>
+        <q-tooltip>{{ $t('Close') }}</q-tooltip>
       </q-btn>
     </q-bar>
 
@@ -76,7 +76,7 @@
       <q-input
         :autofocus="true"
         v-model="model.name"
-        label="Name"
+        :label="$t('Name')"
         dense
         outlined
         maxlength="100"
@@ -89,7 +89,7 @@
       <q-input
         :autofocus="true"
         v-model="model.code"
-        label="Code"
+        :label="$t('Code')"
         dense
         outlined
         maxlength="10"
@@ -105,14 +105,14 @@
         class="q-px-md"
         @click="emit('onClose')"
         :disable="saving"
-        >Cancel</q-btn
+        >{{ $t('Cancel') }}</q-btn
       >
       <q-btn
         color="primary"
         class="q-px-md q-ml-md"
         @click="onSubmit"
         :disable="saving"
-        >Save</q-btn
+        >{{ $t('Save') }}</q-btn
       >
     </q-card-section>
   </q-card>

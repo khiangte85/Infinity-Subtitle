@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { QTableColumn } from 'quasar';
   import { onMounted, ref } from 'vue';
+  import { useI18n } from 'vue-i18n';
   import { backend as models } from '../../wailsjs/go/models.js';
   import { GetMovieByID } from '../../wailsjs/go/backend/Movie.js';
   import {
@@ -14,6 +15,7 @@
   import { useRouter } from 'vue-router';
   import { useQuasar } from 'quasar';
 
+  const { t } = useI18n();
   const $q = useQuasar();
   const router = useRouter();
   const movieId = router.currentRoute.value.params.id;
@@ -100,14 +102,14 @@
     let tempColumns: QTableColumn[] = [
       {
         name: 'sl_no',
-        label: 'Sl No',
+        label: t('Sl No'),
         field: 'sl_no',
         align: 'left' as const,
         sortable: false,
       },
       {
         name: 'time',
-        label: 'Time',
+        label: t('Time'),
         field: 'time',
         align: 'left' as const,
         sortable: false,
@@ -116,7 +118,7 @@
         name: movie.value?.default_language || '',
         label:
           movie.value?.languages[movie.value?.default_language] +
-            ' (Default)' || '',
+            ` (${t('Default')})` || '',
         field: movie.value?.default_language || '',
         align: 'left' as const,
         sortable: false,
@@ -195,7 +197,7 @@
 
       if (value === null || value === undefined || value === '') {
         $q.notify({
-          message: 'Subtitle cannot be empty',
+          message: t('Subtitle cannot be empty'),
           color: 'negative',
           icon: 'fas fa-times',
         });
@@ -206,13 +208,13 @@
       await UpdateSubtitle(subtitle);
 
       $q.notify({
-        message: 'Subtitle updated successfully',
+        message: t('Subtitle updated successfully'),
         color: 'primary',
         icon: 'fas fa-check',
       });
     } catch (error) {
       $q.notify({
-        message: 'Failed to update subtitle',
+        message: t('Failed to update subtitle'),
         color: 'negative',
         icon: 'fas fa-times',
       });
@@ -227,7 +229,7 @@
     class="full-width row justify-between items-center"
   >
     <q-card-section class="q-py-none q-pl-none">
-      <h6 class="text-h6">{{ movie?.title }}'s subtitles</h6>
+      <h6 class="text-h6">{{ movie?.title }}'s {{ $t('subtitles') }}</h6>
     </q-card-section>
     <q-card-section class="q-py-sm">
       <div class="row q-gutter-md justify-end">
@@ -239,7 +241,7 @@
           size="sm"
           @click="showImport = true"
         >
-          <q-tooltip> Import default language subtitle </q-tooltip>
+          <q-tooltip>{{ $t('Import default language subtitle') }}</q-tooltip>
         </q-btn>
         <q-btn
           round
@@ -249,7 +251,7 @@
           size="sm"
           @click="showTranslate = true"
         >
-          <q-tooltip> Translate subtitles </q-tooltip>
+          <q-tooltip>{{ $t('Translate subtitles') }}</q-tooltip>
         </q-btn>
         <q-btn
           round
@@ -259,7 +261,7 @@
           size="sm"
           @click="showExport = true"
         >
-          <q-tooltip> Export subtitles </q-tooltip>
+          <q-tooltip>{{ $t('Export subtitles') }}</q-tooltip>
         </q-btn>
       </div>
     </q-card-section>
@@ -274,10 +276,7 @@
         class="full-width text-body2 bg-primary text-white q-mb-sm q-pa-sm"
       >
         <q-icon name="fas fa-keyboard" />
-        <span class="q-ml-sm"
-          >Focus on the subtitle and press Ctrl+S or Command+S to save or update
-          the subtitle</span
-        >
+        <span class="q-ml-sm">{{ $t('Focus on the subtitle and press Ctrl+S to save or update the subtitle') }}</span>
       </q-badge>
     </div>
     <q-space />
@@ -290,7 +289,7 @@
             .filter(([code]) => code !== movie?.default_language)
             .map(([code, name]) => ({ label: name, value: code }))
         "
-        label="Select Languages"
+        :label="$t('Select Languages')"
         emit-value
         map-options
         multiple
@@ -330,12 +329,12 @@
     v-model:pagination="pagination"
     :rows-per-page-options="[10, 20, 50]"
     binary-state-sort
-    rows-per-page-label="Records per page"
+    :rows-per-page-label="$t('Records per page')"
     @request="onRequest"
     :no-data-label="
       loading
-        ? 'Loading...'
-        : 'No subtitles found, Please import subtitle of default language'
+        ? $t('Loading...')
+        : $t('No subtitles found, Please import subtitle of default language')
     "
     :resizable-columns="true"
     :style="{ height: 'calc(100vh - 300px)' }"

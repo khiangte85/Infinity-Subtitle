@@ -16,7 +16,7 @@
             fontWeight: 'bold',
           }"
         >
-          Infinity Subtitle
+          {{ $t('Infinity Subtitle') }}
         </q-item-label>
       </q-item-section>
     </q-item>
@@ -54,7 +54,7 @@
               fontSize: '14px',
             }"
           >
-            {{ route.meta?.title }}
+            {{ $t(route.meta?.title as string) }}
           </q-item-label>
         </q-item-section>
       </q-item>

@@ -474,7 +474,7 @@ func TranslateSubtitleFromQueue(ctx context.Context) error {
 					continue
 				}
 
-				err = s.TranslateSubtitles(movie.m.ID, movie.m.DefaultLanguage, code)
+				_, err := s.TranslateSubtitles(movie.m.ID, movie.m.DefaultLanguage, code)
 				if err != nil {
 					if rollbackErr := tx.Rollback(); rollbackErr != nil {
 						logger.Error("failed to rollback transaction: %w", rollbackErr)

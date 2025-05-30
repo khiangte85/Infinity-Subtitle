@@ -8,6 +8,6 @@ export function GetSubtitlesByMovieID(arg1:number,arg2:backend.Pagination):Promi
 
 export function ImportFromSRTFile(arg1:backend.Movie,arg2:string):Promise<void>;
 
-export function TranslateSubtitles(arg1:number,arg2:string,arg3:string):Promise<void>;
+export function TranslateSubtitles(arg1:number,arg2:string,arg3:string):Promise<Array<string>>;
 
 export function UpdateSubtitle(arg1:backend.Subtitle):Promise<void>;
